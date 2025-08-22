@@ -2,6 +2,8 @@
  * Z80SIM  -  a Z80-CPU simulator
  *
  * Copyright (C) 2025 Thomas Eberhardt
+ *
+ * SDL joystick support added by Ansgar Kueckes
  */
 
 /*
@@ -39,6 +41,13 @@ typedef struct window {
 	win_funcs_t *funcs;
 } window_t;
 
+int sdl_joystick_0_x_axis = 0;
+int sdl_joystick_0_y_axis = 0;
+int sdl_joystick_1_x_axis = 0;
+int sdl_joystick_1_y_axis = 0;
+BYTE sdl_joystick_0_buttons = 0;
+BYTE sdl_joystick_1_buttons = 0;
+
 static window_t win[MAX_WINDOWS];
 static bool sim_finished;	/* simulator thread finished flag */
 
@@ -48,14 +57,23 @@ int main(int argc, char *argv[])
 	bool quit = false, tick;
 	SDL_Thread *sim_thread;
 	uint64_t t1, t2;
-	int i, status;
+	int i, status, sdl_num_joysticks;
 	args_t args = {argc, argv};
 
 	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
-	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0) {
 		fprintf(stderr, "Can't initialize SDL: %s\n", SDL_GetError());
 		return EXIT_FAILURE;
 	}
+
+	/* check for joysticks */
+	sdl_num_joysticks = SDL_NumJoysticks();
+	printf("\n%d joystick(s) connected\n\n\r", sdl_num_joysticks);
+	for (i=0; i<sdl_num_joysticks; i++) {
+        	if (SDL_JoystickOpen(i) == NULL)
+            		fprintf(stderr, "SDL: error reading joystick %d\n", i);
+        }
+
 #ifdef FRONTPANEL
 	i = IMG_INIT_JPG | IMG_INIT_PNG;
 	if ((IMG_Init(i) & i) == 0) {
@@ -89,8 +107,67 @@ int main(int argc, char *argv[])
 	while (!quit) {
 		/* process event queue */
 		while (SDL_PollEvent(&event) != 0) {
-			if (event.type == SDL_QUIT)
+			switch(event.type) {
+			case SDL_JOYAXISMOTION:
+				switch(event.jdevice.which) {
+					case 0:
+						switch(event.jaxis.axis) {
+							case 0:
+								sdl_joystick_0_x_axis = event.jaxis.value;
+								break;
+							case 1:
+								sdl_joystick_0_y_axis = event.jaxis.value;
+								break;
+							default:;
+						}
+						break;
+					case 1:
+						switch(event.jaxis.axis) {
+							case 0:
+								sdl_joystick_1_x_axis = event.jaxis.value;
+								break;
+							case 1:
+								sdl_joystick_1_y_axis = event.jaxis.value;
+								break;
+							default:;
+						}
+						break;
+					default:;
+				}
+				break;
+			case SDL_JOYHATMOTION:
+				break;
+			case SDL_JOYBUTTONDOWN:
+				switch(event.jdevice.which) {
+					case 0:
+						sdl_joystick_0_buttons |= 1 << event.jbutton.button;
+						break;
+					case 1:
+						sdl_joystick_1_buttons |= 1 << event.jbutton.button;
+						break;
+					default:;
+				}	
+				break;
+			case SDL_JOYBUTTONUP:
+				switch(event.jdevice.which) {
+					case 0:
+						sdl_joystick_0_buttons &= ~(1 << event.jbutton.button);
+						break;
+					case 1:
+						sdl_joystick_1_buttons &= ~(1 << event.jbutton.button);
+						break;
+					default:;
+				}	
+				break;
+			case SDL_JOYDEVICEADDED:
+				break;
+			case SDL_JOYDEVICEREMOVED:
+				break;
+			case SDL_QUIT:
 				quit = true;
+				break;
+			default:;
+			}
 
 			for (i = 0; i < MAX_WINDOWS; i++)
 				if (win[i].in_use)
