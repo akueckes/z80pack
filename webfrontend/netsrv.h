@@ -29,6 +29,8 @@ typedef enum net_device {
 	DEV_88ACC,
 	DEV_D7AIO,
 	DEV_PTR,
+	DEV_NMKR,
+	DEV_HIRES,
 	_DEV_MAX
 } net_device_t;
 

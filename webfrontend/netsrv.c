@@ -74,7 +74,8 @@ static struct {
 static net_device_t net_device_a[_DEV_MAX] = {
 	DEV_TTY, DEV_TTY2, DEV_TTY3,
 	DEV_LPT, DEV_VIO, DEV_CPA,
-	DEV_DZLR, DEV_88ACC, DEV_D7AIO, DEV_PTR
+	DEV_DZLR, DEV_88ACC, DEV_D7AIO, DEV_PTR,
+	DEV_HIRES
 };
 
 static const char *dev_name[] = {
@@ -87,7 +88,8 @@ static const char *dev_name[] = {
 	"DZLR",
 	"ACC",
 	"D7AIO",
-	"PTR"
+	"PTR",
+	"HIRES"
 };
 
 static int last_error = 0; //TODO: replace
@@ -596,6 +598,7 @@ static int WebSocketConnectHandler(const HttpdConnection_t *conn, void *device)
 		case DEV_DZLR:
 		case DEV_88ACC:
 		case DEV_D7AIO:
+		case DEV_HIRES:
 			res = msgget(IPC_PRIVATE, 0644 | IPC_CREAT); //TODO: check flags
 			if (res < 0)
 				perror("msgget()");
@@ -921,6 +924,13 @@ int start_net_services(int port)
 				 WebsocketDataHandler,
 				 WebSocketCloseHandler,
 				 (void *) &net_device_a[DEV_D7AIO]);
+
+	mg_set_websocket_handler(ctx, "/hires",
+				 WebSocketConnectHandler,
+				 WebSocketReadyHandler,
+				 WebsocketDataHandler,
+				 WebSocketCloseHandler,
+				 (void *) &net_device_a[DEV_HIRES]);
 
 #ifdef DEBUG
 	/* List all listening ports */
