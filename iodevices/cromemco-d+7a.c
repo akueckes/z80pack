@@ -21,12 +21,6 @@
 #include "simglb.h"
 
 #ifdef WANT_SDL
-#undef WANT_PORTAUDIO
-#else
-#define WANT_PORTAUDIO
-#endif
-
-#ifdef WANT_SDL
 #include <SDL.h>
 #include "simsdl.h"
 #endif

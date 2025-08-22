@@ -10,6 +10,8 @@ FRONTPANEL ?= YES
 INFOPANEL ?= YES
 # use SDL2 instead of X11
 WANT_SDL ?= NO
+# use PortAudio as sound framework (instead of SDL2)
+WANT_PORTAUDIO ?= NO
 # machine specific system source files
 MACHINE_SRCS = simcfg.c simio.c simmem.c simctl.c
 # machine specific I/O source files
@@ -78,6 +80,24 @@ PLAT_INCS = -F/Library/Frameworks -I/Library/Frameworks/SDL2.framework/Headers
 PLAT_LDFLAGS = -Wl,-search_paths_first -Wl,-headerpad_max_install_names \
 	-Wl,-rpath,/Library/Frameworks
 PLAT_LDLIBS = -framework SDL2
+endif
+else ifeq ($(WANT_PORTAUDIO),YES)
+ifeq ($(INFOPANEL),YES)
+PLAT_DEFS = -DINFOPANEL -DWANT_PORTAUDIO
+PLAT_SRCS = simpanel.c
+else
+PLAT_DEFS = -DWANT_PORTAUDIO
+endif
+ifeq ($(TARGET_OS),BSD)
+PLAT_INCS = -I/usr/local/include
+PLAT_LDFLAGS = -L/usr/local/lib
+PLAT_LDLIBS = -lX11 -l portaudio
+else ifeq ($(TARGET_OS),LINUX)
+PLAT_LDLIBS = -lX11 -l portaudio
+else ifeq ($(TARGET_OS),OSX)
+PLAT_INCS = -I/opt/X11/include -I/opt/local/include -I/usr/local/include
+PLAT_LDFLAGS = -L/opt/X11/lib -L/usr/local/lib
+PLAT_LDLIBS = -lX11 -l portaudio
 endif
 else
 ifeq ($(INFOPANEL),YES)
@@ -149,7 +169,7 @@ endif
 CFLAGS = $(CSTDS) $(COPTS) $(CWARNS)
 
 LDFLAGS = -L$(FP_DIR) -L$(CIV_DIR) $(PLAT_LDFLAGS)
-LDLIBS = $(CIV_LDLIBS) $(FP_LDLIBS) $(PLAT_LDLIBS) -lm -lpthread -l portaudio
+LDLIBS = $(CIV_LDLIBS) $(FP_LDLIBS) $(PLAT_LDLIBS) -lm -lpthread
 
 INSTALL = install
 INSTALL_PROGRAM = $(INSTALL)

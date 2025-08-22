@@ -74,11 +74,6 @@
 #endif
 #include "ads-noisemaker.h"
 
-/* Usage of PortAudio and SDL is mutual exclusive */
-#ifdef WANT_PORTAUDIO
-#undef WANT_SDL
-#endif
-
 #ifdef WANT_SDL
 #include <SDL.h>
 #include "simsdl.h"
