@@ -6,10 +6,48 @@ This fork adds a couple of features to the original upstream project:
 - support for S100 sound cards with SDL2 and PortAudio sound frameworks (currently supported Cromemco D+7A and ADS Noisemaker)
 - joystick support (Cromemco D+7A) with common USB game controllers
 - more accurate Cromemco Dazzler emulation (interlaced display, line status flag, window resize etc.)
-- support for higher resolution S100 graphics (currently supported Vector Graphic High Resolution graphics board)
+- support for higher resolution S100 monochrome graphics (currently supported Vector Graphic High Resolution graphics board)
+- build switches for Cromemco Dazzler and D+7A boards have been separated, see cromemcosim and imsaisim for an example implementation
 
-## Notes/limitations:
+## General notes/limitations:
+- cromemcosim and imsaisim are used as examples how to enable and pre-configure the added hardware emulations
 - Sound cards, joysticks or high resolution graphics currently work in command line mode only, not with the web frontend (Javascript library needs to be updated)
+
+## Notes on Cromemco Dazzler
+- define HAS_DAZZLER in the appropriate sim.h file to enable this emulation
+- additional config settings in the system.conf file:
+-- set dazzler_interlaced to 1 to enable interlaced display for the Dazzler
+-- set dazzler_line_sync to 1 to enable more accurate timing for the Dazzler (also enables the even/odd line status flag
+-- set dazzler_descrete_scale to 1 if you prefer window sizing with full multiples of the pixel count
+
+## Notes on Cromemco D+7A
+- the D+7A now supports both audio playback and joystick inputs
+- can be configured to produce a sound file as recording of an audio sequence
+- build z80pack with WANT_SDL=YES to use SDL2 framework for display, joystick and sound (recommended)
+- alternatively, build z80pack with WANT_PORTAUDIO=YES to use the PortAudio framework for sound only
+- joystick and audio emulates two JS-1 joysticks with integrated speaker
+- joystick 1 uses the lower 4 bits of port 24 for buttons (pressed=0), port 25 for x-axis and audio, and port 26 for y-axis
+- joystick 2 uses the upper 4 bits of port 24 for buttons (pressed=0), port 27 for x-axis and audio, and port 28 for y-axis
+- additional config settings in the system.conf file:
+	- set d7a_sync_adjust as a floating point number to adjust the sound buffer processing speed (to reach the optimum balance between buffer overflows and underflows)
+	- set d7a_sample_rate as an integer for the sampling rate of the audio framework
+	- set d7a_recording_limit as an integer for the total number of samples to limit the size of a recording
+	- set d7a_buffer_size as an integer for the size of the sample buffer (limits the processing delay)
+	- set d7a_soundfile as a string for the filename of the recording file (also enables recording)
+
+## Notes on ADS Noisemaker
+- uses two AY-3-8910 programmes sound generators for stereo synthesis with 6 independet tone channels and 2 noise channels
+- build z80pack with WANT_SDL=YES to use SDL2 framework for sound (recommended)
+- alternatively, build z80pack with WANT_PORTAUDIO=YES to use the PortAudio framework for sound
+	- set noisemaker_sample_rate as an integer for the sampling rate of the audio framework
+	- set noisemaker_recording_limit as an integer for the total number of samples to limit the size of a recording
+	- set noisemaker_soundfile as a string for the filename of the recording file (also enables recording)
+
+## Notes on Vector Graphic HiRes Graphics
+- the Vector Graphic HiRes Graphics emulation uses a fixed window size (not resizable)
+	- set vector_graphic_hires_mode for the graphic mode either to "bilevel" or "halftone"
+	- set vector_graphic_hires_address as an integer for the start address of the video buffer in memory
+	- set vector_graphic_hires_foreground as an RGB string for the foreground color (simulates a monochrome CRT display color)
 
 Full documentation is at https://www.icl1900.co.uk/unix4fun/z80pack
 
