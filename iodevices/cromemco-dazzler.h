@@ -6,6 +6,7 @@
  * Copyright (C) 2015-2019 by Udo Munk
  * Copyright (C) 2018 David McNaughton
  * Copyright (C) 2025 by Thomas Eberhardt
+ * Copyright (C) 2025 Ansgar Kueckes (realtime extensions)
  *
  * Emulation of a Cromemco DAZZLER S100 board
  *
@@ -25,6 +26,7 @@
  * 19-JUL-2018 integrate webfrontend
  * 04-NOV-2019 remove fake DMA bus request
  * 04-JAN-2025 add SDL2 support
+ * 06-JUN-2025 added support for interlaced video, line flag and window resize
  */
 
 #ifndef CROMEMCO_DAZZLER_INC
@@ -32,6 +34,10 @@
 
 #include "sim.h"
 #include "simdefs.h"
+
+extern bool dazzler_interlaced;
+extern bool dazzler_line_sync;
+extern bool dazzler_descrete_scale;
 
 void cromemco_dazzler_off(void);
 

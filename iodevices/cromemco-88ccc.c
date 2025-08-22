@@ -99,7 +99,7 @@ static void *store_image(void *arg)
 		/* sleep_for_ms(j); */
 
 		/* sleep rest of total frame time */
-		tleft = j * 1000 - (long) (get_clock_us() - t1);
+		tleft = j * 1000 - (long) (get_clock_us() - t);
 		if (tleft > 0)
 			sleep_for_us(tleft);
 

@@ -6,6 +6,7 @@
  * Copyright (C) 2015-2019 by Udo Munk
  * Copyright (C) 2018 David McNaughton
  * Copyright (C) 2025 by Thomas Eberhardt
+ * Copyright (C) 2025 Ansgar Kueckes (realtime extensions)
  *
  * Emulation of a Cromemco DAZZLER S100 board
  *
@@ -25,7 +26,8 @@
  * 19-JUL-2018 integrate webfrontend
  * 04-NOV-2019 remove fake DMA bus request
  * 04-JAN-2025 add SDL2 support
- */
+ * 06-JUN-2025 added support for interlaced video, line flag/busmaster and window resize
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,6 +37,10 @@
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <string.h>
+#if 0
+#include <X11/extensions/Xrender.h>
+#endif
 #endif
 
 #include "sim.h"
@@ -43,6 +49,7 @@
 #include "simcfg.h"
 #include "simmem.h"
 #include "simport.h"
+#include "simcore.h"
 #ifdef WANT_SDL
 #include "simsdl.h"
 #endif
@@ -64,12 +71,22 @@ static const char *TAG = "DAZZLER";
 
 #include "cromemco-dazzler.h"
 
+/* parameters configurable in system.conf */
+bool dazzler_interlaced = false;	/* non-interlaced display by default */
+bool dazzler_line_sync = false;		/* no line sync by default */
+bool dazzler_descrete_scale = false;	/* no decsrete window scaling by default */
+
 /* SDL2/X11 stuff */
-#define WSIZE 512
-static int size = WSIZE;
+#define WSIZE 384
+static int canvas_size = WSIZE;
+static int window_size = WSIZE;
+static int pscale = 1;
+static bool window_resized = false;
+
 #ifdef WANT_SDL
 static int dazzler_win_id = -1;
 static SDL_Window *window;
+static SDL_Surface *surface;
 static SDL_Renderer *renderer;
 static uint8_t colors[16][3] = {
 	{ 0x00, 0x00, 0x00 },
@@ -112,7 +129,9 @@ static Display *display;
 static Window window;
 static int screen;
 static GC gc;
+static Window rootwindow;
 static XWindowAttributes wa;
+static Atom wm_focused, wm_maxhorz, wm_maxvert, wm_hidden;	
 static Pixmap pixmap;
 static Colormap colormap;
 static XColor colors[16];
@@ -152,10 +171,17 @@ static char gray15[] =  "#FFFFFF";
 #endif /* !WANT_SDL */
 
 /* DAZZLER stuff */
-static bool state;
-static WORD dma_addr;
+static bool state, last_state;
+static WORD dma_addr, addr;
+static BYTE line_buffer[32];
 static BYTE flags = 64;
 static BYTE format;
+static int ticks_per_usleep;
+static int field;
+static int scanline;
+#define EVEN	0		/* only even fields */
+#define ODD	1		/* only odd fields */
+#define FULL	2		/* all fields */
 
 #if !defined(WANT_SDL) || defined(HAS_NETSERVER)
 /* UNIX stuff */
@@ -167,44 +193,76 @@ static void ws_clear(void);
 static BYTE formatBuf = 0;
 #endif
 
+/* debug data */
+struct {
+	int ticks[10][64];
+	int gap[10][64];
+	int cycle[10];
+	int row_index;
+	int frame_index;
+} row_data;
+
 /* create the SDL2 or X11 window for DAZZLER display */
 static void open_display(void)
 {
+	int i;
+	uint64_t t_start;
+	
+	/* calibrate sleep timer */
+	if (dazzler_line_sync) {
+		t_start = T;
+		for (i=0; i<1000; i++) sleep_for_us(1);
+		ticks_per_usleep = (T - t_start) / 1000;
+	}
+	row_data.frame_index = 0;
+	
 #ifdef WANT_SDL
 	window = SDL_CreateWindow("Cromemco DAzzLER",
 				  SDL_WINDOWPOS_UNDEFINED,
 				  SDL_WINDOWPOS_UNDEFINED,
-				  size, size, 0);
+				  window_size, window_size, SDL_WINDOW_SHOWN|SDL_WINDOW_RESIZABLE);
 	renderer = SDL_CreateRenderer(window, -1, (SDL_RENDERER_ACCELERATED |
 						   SDL_RENDERER_PRESENTVSYNC));
+	surface = SDL_GetWindowSurface(window);
 #else /* !WANT_SDL */
-	Window rootwindow;
 	XSizeHints *size_hints = XAllocSizeHints();
 	Atom wm_delete_window;
-
+	
 	display = XOpenDisplay(NULL);
 	XLockDisplay(display);
 	screen = DefaultScreen(display);
 	rootwindow = RootWindow(display, screen);
 	XGetWindowAttributes(display, rootwindow, &wa);
 	window = XCreateSimpleWindow(display, rootwindow, 0, 0,
-				     size, size, 1, 0, 0);
+				     window_size, window_size, 1, 0, 0);
 	XStoreName(display, window, "Cromemco DAzzLER");
-	size_hints->flags = PSize | PMinSize | PMaxSize;
-	size_hints->min_width = size;
-	size_hints->min_height = size;
-	size_hints->base_width = size;
-	size_hints->base_height = size;
-	size_hints->max_width = size;
-	size_hints->max_height = size;
+	size_hints->flags = PSize | PMinSize | PAspect | PResizeInc;
+	size_hints->min_width = canvas_size;
+	size_hints->min_height = canvas_size;
+	size_hints->base_width = canvas_size;
+	size_hints->base_height = canvas_size;
+	size_hints->min_aspect.x = 1;
+	size_hints->min_aspect.y = 1;
+	size_hints->max_aspect.x = 1;
+	size_hints->max_aspect.y = 1;
+	size_hints->width_inc = 10;
+	size_hints->height_inc = 10;
 	XSetWMNormalHints(display, window, size_hints);
 	XFree(size_hints);
+
+	wm_focused = XInternAtom(display, "_NET_WM_STATE_FOCUSED", 1);
+    	wm_maxhorz = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", 1);
+    	wm_maxvert = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", 1);
+    	wm_hidden = XInternAtom(display, "_NET_WM_STATE_HIDDEN", 1);		
 	wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
 	XSetWMProtocols(display, window, &wm_delete_window, 1);
+
+	XSelectInput(display, window, StructureNotifyMask | PropertyChangeMask);
+
 	colormap = DefaultColormap(display, 0);
 	gc = XCreateGC(display, window, 0, NULL);
 	XSetFillStyle(display, gc, FillSolid);
-	pixmap = XCreatePixmap(display, rootwindow, size, size,
+	pixmap = XCreatePixmap(display, rootwindow, window_size, window_size,
 			       wa.depth);
 
 	XParseColor(display, colormap, color0, &colors[0]);
@@ -311,6 +369,11 @@ static void kill_thread(void)
 /* switch DAZZLER off from front panel */
 void cromemco_dazzler_off(void)
 {
+#if 0
+	int frame, row;
+#endif
+
+	last_state = state;
 	state = false;
 
 #ifdef WANT_SDL
@@ -336,6 +399,18 @@ void cromemco_dazzler_off(void)
 		ws_clear();
 #endif
 #endif /* !WANT_SDL */
+
+#if 0
+	/* ouput debug data */
+	if (dazzler_line_sync) {
+		for (frame=0; frame<row_data.frame_index; frame++) {
+			for (row=0; row<64; row++) {
+				printf("frame=%d row=%d cycle=%d ticks=%d gap=%d\n",
+				frame, row, row_data.cycle[frame], row_data.ticks[frame][row], row_data.gap[frame][row]);
+			}
+		}
+	}
+#endif
 }
 
 #ifdef WANT_SDL
@@ -343,7 +418,17 @@ void cromemco_dazzler_off(void)
 /* process SDL event */
 static void process_event(SDL_Event *event)
 {
-	UNUSED(event);
+	switch(event->type) {
+	case SDL_WINDOWEVENT:
+		if ((event->window.event == SDL_WINDOWEVENT_RESIZED) ||
+			(event->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) ||
+			(event->window.event == SDL_WINDOWEVENT_MAXIMIZED) ||
+			(event->window.event == SDL_WINDOWEVENT_RESTORED)) {
+			window_resized = true;
+		}
+		break;
+	default:;
+	}
 }
 
 static inline void set_fg_color(int i)
@@ -386,245 +471,299 @@ static inline void fill_rect(int x, int y, int w, int h)
 
 #endif /* !WANT_SDL */
 
-/* draw pixels for one frame in hires */
-static void draw_hires(void)
-{
-	int psize, x, y, i;
-	WORD addr = dma_addr;
+/*
+	Draw scanlines for a full frame (time correct)
 
-	/* set color or grayscale from lower nibble in graphics format */
-	i = format & 0x0f;
-	if (format & 16)
-		set_fg_color(i);
-	else
-		set_fg_gray(i);
-	if (format & 32) {	/* 2048 bytes memory */
-		psize = size / 128;	/* size of one pixel for 128x128 */
-		for (y = 0; y < 64; y += 2) {
-			for (x = 0; x < 64;) {
-				i = dma_read(addr);
-				if (i & 1)
-					fill_rect(x * psize, y * psize, psize, psize);
-				if (i & 2)
-					fill_rect((x + 1) * psize, y * psize, psize, psize);
-				if (i & 4)
-					fill_rect(x * psize, (y + 1) * psize, psize, psize);
-				if (i & 8)
-					fill_rect((x + 1) * psize, (y + 1) * psize, psize, psize);
-				if (i & 16)
-					fill_rect((x + 2) * psize, y * psize, psize, psize);
-				if (i & 32)
-					fill_rect((x + 3) * psize, y * psize, psize, psize);
-				if (i & 64)
-					fill_rect((x + 2) * psize, (y + 1) * psize, psize, psize);
-				if (i & 128)
-					fill_rect((x + 3) * psize, (y + 1) * psize, psize, psize);
-				x += 4;
-				addr++;
-			}
+	Dazzler timings
+	
+	  3.579545 MHz hardware clock
+	  1.790 MHz pixel clock
+	  15.98 KHz line frequency
+	  62 Hz vertical frequency (interlaced)
+	  Vertical scan 12 ms
+	  Vertical blank 4 ms
+	  DMA cycle 375 us
+	  12 scanlines/pixel (low resolution nibble mode, 32x32)
+	  6 scanlines/pixel (medium resolution nibble mode, 64x64)
+	  3 scanlines/pixel (high resolution x4 mode, 128x128)
+	  384 scanlines per frame
+	  192 scanlines per field (interlaced)
+	  16 or 32 memory locations per line, depending on the video mode
+	
+	Parameters
+	
+	The field value identifies either even field (field=EVEN),
+	odd field(field=ODD), or both fields (field = FULL)
+	
+	How it works
+	
+	The whole field is divided into DMA cycles, where the Dazzler board
+	fetches the display data from the main memory at the memory address
+	defined in the address register accessible via I/O port 0xE.
+	Depending on the current video mode, the Dazzler fetches either
+	16 or 32 bytes per DMA cycle every 375 microseconds.
+	
+	The data is copied into a 4x64-bit shift register, which operates
+	as a cache ("recycle buffer") for up to 64 nibbles, so that the pixel
+	data can be streamed for each following scanline without the need
+	for re-fetching the data from main memory. Each DMA cycle covers 12
+	scanlines in 512 byte mode, and 6 scanlines in 2K byte mode.
+	
+	For accurate emulation, the host actually should be put into hold mode
+	during the DMA fetch, which in the real hardware is slowing down
+	processing by roughly 15%. This, however, has not yet been implemented
+	yet in the emulation, so the host is always running at full speed.
+	
+	Implementation
+
+	Just as with the real Dazzler hardware, the scanline counter triggers
+	the DMA cycles for "stealing" the pixel data from the video buffer
+	memory. The meaning of the fetched pixel data depends on the current
+	video mode, which is controlled by the format register accesible
+	through I/O port 0xF. The content of both Dazzler registers are always
+	effective, which means that they can be altered on-the-fly during
+	display refresh.
+	
+	While normally changes of display memory and registers should be done
+	during the vertical blank period (in order not to disturb a stable
+	picture), also intentional tweaking is possible (and originally
+	intended by the designers, see Dazzler patent documentation).
+	
+	However, in order to control the display in real time, the host needs
+	to know the current position of the CRT beam. The Dazzler offers
+	the appropriate reference in the flags register, which can be accessed
+	via I/O port 0xF.
+	
+	The flags register holds one flag called end-of-frame, indicating the
+	vertical scan vs. vertical retrace period, and another flag called
+	odd-line-even-line, indicating even vs. odd DMA	cycles (rather than
+	even vs. odd scanlines):
+	
+	   +---+---+---+---+---+---+---+---+
+	   | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+	   +---+---+---+---+---+---+---+---+
+	     |   |   |   |   |   |   |   |
+	     |   |   +---+---+---+---+---+--- don't care
+	     |   +--- vertical blank
+	     +------- odd-line-even-line
+
+	Bit 6 can the used to perform changes on the display data during
+	vertical blank without breaking the picture. Bit 7 can be used to
+	track the switches between DMA cycles / scanline groups subsequently
+	written to the display. Tracking those groups from the start of the
+	screen gives the current vertical position of the beam.
+	
+	The end-of-frame flag also can be used as real time reference, as the 
+	flag is changing with 62 Hz. The odd-line-even-line flag is only active
+	during the scan period when bit 6 is true.
+	
+	The reference to "even lines/odd lines" is a bit misleading, since that
+	flag actually refers to the DMA cycles, which are matching display
+	lines only in the nibble mode, not in the x4 mode, and are especially
+	not referring scanlines. Normally the emulator draws a full frame as
+	fast as possible, sleeping for the rest of the vertical period for
+	being in sync with the vertical frequency. If an application requires
+	syncing to the DMA cycles (e.g. for tracking the line flag), you
+	can enable line sync by sttting the variable dazzler_line_sync in
+	the system.conf file to 1.
+	
+	The Dazzler hardware is always operating in interlaced mode, where the
+	display shows fields of even and odd scanlines alternating with a
+	vertical frequency of 62 Hz.
+	
+	Because X Windows actually can't fully keep up drawing interlaced
+	fields, this emulation by default runs in a flickerless	non-interlaced
+	mode, which flattens all scanlines into a single frame with 31 Hz
+	refresh. You can switch to the more accurate interlaced mode by setting
+	the dazzler_interlaced property in the system.conf file to 1.
+	
+	Most accurate timing therefore can be configured by setting both
+	dazzler_interaced and dazzler_line_sync in the sytem.conf file to 1.
+	
+	Neither Linux nor Windows are offering an accurate sleep function
+	for descheduling the current thread for a certain amount of time.
+	The z80pack functions sleep_for_ms() and sleep_for_us() both can
+	result in almost any delay. Our workaround here is using
+	sleep_for_us(1), which is the shortest possible latency, and
+	synchronizes with the state clock of the emulated CPU. Not perfect,
+	but seems to deliver the best possible results.
+*/
+static Tstates_t dazzler_busmaster(BYTE bus_ack)
+{
+	int num_bytes;
+
+	if (!bus_ack) return 0;
+
+	num_bytes = format & 0x20 ? 32 : 16;
+
+#if 0
+	/* read DMA memory into line buffer */
+	int bytepos, offset;
+	for (bytepos=0; bytepos<num_bytes; bytepos++) {
+		offset = bytepos % 16;
+		if (format & 0x20) {
+			/* add quadrant offset */
+			if (bytepos > 15) offset += 512;
+			if (scanline > 191) offset += 512;
 		}
-		for (y = 0; y < 64; y += 2) {
-			for (x = 64; x < 128;) {
-				i = dma_read(addr);
-				if (i & 1)
-					fill_rect(x * psize, y * psize, psize, psize);
-				if (i & 2)
-					fill_rect((x + 1) * psize, y * psize, psize, psize);
-				if (i & 4)
-					fill_rect(x * psize, (y + 1) * psize, psize, psize);
-				if (i & 8)
-					fill_rect((x + 1) * psize, (y + 1) * psize, psize, psize);
-				if (i & 16)
-					fill_rect((x + 2) * psize, y * psize, psize, psize);
-				if (i & 32)
-					fill_rect((x + 3) * psize, y * psize, psize, psize);
-				if (i & 64)
-					fill_rect((x + 2) * psize, (y + 1) * psize, psize, psize);
-				if (i & 128)
-					fill_rect((x + 3) * psize, (y + 1) * psize, psize, psize);
-				x += 4;
-				addr++;
-			}
-		}
-		for (y = 64; y < 128; y += 2) {
-			for (x = 0; x < 64;) {
-				i = dma_read(addr);
-				if (i & 1)
-					fill_rect(x * psize, y * psize, psize, psize);
-				if (i & 2)
-					fill_rect((x + 1) * psize, y * psize, psize, psize);
-				if (i & 4)
-					fill_rect(x * psize, (y + 1) * psize, psize, psize);
-				if (i & 8)
-					fill_rect((x + 1) * psize, (y + 1) * psize, psize, psize);
-				if (i & 16)
-					fill_rect((x + 2) * psize, y * psize, psize, psize);
-				if (i & 32)
-					fill_rect((x + 3) * psize, y * psize, psize, psize);
-				if (i & 64)
-					fill_rect((x + 2) * psize, (y + 1) * psize, psize, psize);
-				if (i & 128)
-					fill_rect((x + 3) * psize, (y + 1) * psize, psize, psize);
-				x += 4;
-				addr++;
-			}
-		}
-		for (y = 64; y < 128; y += 2) {
-			for (x = 64; x < 128;) {
-				i = dma_read(addr);
-				if (i & 1)
-					fill_rect(x * psize, y * psize, psize, psize);
-				if (i & 2)
-					fill_rect((x + 1) * psize, y * psize, psize, psize);
-				if (i & 4)
-					fill_rect(x * psize, (y + 1) * psize, psize, psize);
-				if (i & 8)
-					fill_rect((x + 1) * psize, (y + 1) * psize, psize, psize);
-				if (i & 16)
-					fill_rect((x + 2) * psize, y * psize, psize, psize);
-				if (i & 32)
-					fill_rect((x + 3) * psize, y * psize, psize, psize);
-				if (i & 64)
-					fill_rect((x + 2) * psize, (y + 1) * psize, psize, psize);
-				if (i & 128)
-					fill_rect((x + 3) * psize, (y + 1) * psize, psize, psize);
-				x += 4;
-				addr++;
-			}
-		}
-	} else {		/* 512 bytes memory */
-		psize = size / 64;	/* size of one pixel for 64x64 */
-		for (y = 0; y < 64; y += 2) {
-			for (x = 0; x < 64;) {
-				i = dma_read(addr);
-				if (i & 1)
-					fill_rect(x * psize, y * psize, psize, psize);
-				if (i & 2)
-					fill_rect((x + 1) * psize, y * psize, psize, psize);
-				if (i & 4)
-					fill_rect(x * psize, (y + 1) * psize, psize, psize);
-				if (i & 8)
-					fill_rect((x + 1) * psize, (y + 1) * psize, psize, psize);
-				if (i & 16)
-					fill_rect((x + 2) * psize, y * psize, psize, psize);
-				if (i & 32)
-					fill_rect((x + 3) * psize, y * psize, psize, psize);
-				if (i & 64)
-					fill_rect((x + 2) * psize, (y + 1) * psize, psize, psize);
-				if (i & 128)
-					fill_rect((x + 3) * psize, (y + 1) * psize, psize, psize);
-				x += 4;
-				addr++;
-			}
-		}
+		line_buffer[bytepos] = dma_read(addr + offset);
 	}
+#endif
+
+	/* simulate bus master activity by returning t-states, slowing down CPU by about 15% */
+	return num_bytes * 3;  /* 3 t-states per byte of DMA */
 }
 
-/* draw pixels for one frame in lowres */
-static void draw_lowres(void)
+static void draw_field(int field)
 {
-	int psize, x, y, i;
-	WORD addr = dma_addr;
+	int bytepos, num_bytes, num_dma, num_lines, current_line, psize, offset, start, step, dma_cycle;
+	BYTE i;
+	int hires_subrow, vpos;
 
-	/* get size of DMA memory and draw the pixels */
-	if (format & 32) {	/* 2048 bytes memory */
-		psize = size / 64;	/* size of one pixel for 64x64 */
-		for (y = 0; y < 32; y++) {
-			for (x = 0; x < 32;) {
-				i = dma_read(addr) & 0x0f;
-				if (format & 16)
-					set_fg_color(i);
-				else
-					set_fg_gray(i);
-				fill_rect(x * psize, y * psize, psize, psize);
-				x++;
-				i = (dma_read(addr) & 0xf0) >> 4;
-				if (format & 16)
-					set_fg_color(i);
-				else
-					set_fg_gray(i);
-				fill_rect(x * psize, y * psize, psize, psize);
-				x++;
-				addr++;
+	Tstates_t T_end_of_row;
+
+	step = (field == FULL) ? 1 : 2;		/* single or dual scanline */
+	start = (field == ODD) ? 1 : 0;		/* first scanline, depending on even/odd field */
+
+	addr = dma_addr;
+
+	current_line = 0;			/* relatve scanline within current DMA cycle */
+	hires_subrow = 0;			/* sub row for x4 more, either 0 or 1 */
+	
+	row_data.row_index = 0;
+	
+	/* clear the line flag */
+	flags &= 0x7f;
+
+	/* select foreground color for hires mode */
+	if (format & 0x40) {
+		i = format & 0x0f;
+		if (format & 0x10) 
+			set_fg_color(i);
+		else
+			set_fg_gray(i);
+	}
+
+	/* now draw the frame */
+	for (scanline=start; scanline<384; scanline+=step) {
+
+		/* register control - can be changed on the fly */
+		num_bytes = format & 0x20 ? 32 : 16;			/* bytes per DMA cycle */
+		num_dma = format & 0x20 ? 64 : 32;			/* DMA cycles per frame */
+		num_lines = 384 / num_dma;				/* scanlines per DMA cycle */
+		if (format & 0x40) psize = 192 / num_dma * pscale;	/* hires monochrome (x4 mode) */
+		else psize = 384 / num_dma * pscale;			/* color/grayscale (nibble) mode */
+		vpos = scanline * pscale;
+
+		if (current_line == 0) {
+			hires_subrow = 0;
+
+			/* calculate DMA cycle */
+			dma_cycle = (num_lines * f_value * 1000000) / 15980;;
+			row_data.cycle[row_data.frame_index] = dma_cycle;
+			T_end_of_row = T + dma_cycle;
+
+			/* read data bytes via DMA & write into display pixmap */
+			for (bytepos=0; bytepos<num_bytes; bytepos++) {
+				/* read DMA memory into line buffer */
+				offset = bytepos % 16;
+				if (format & 0x20) {
+					/* add quadrant offset */
+					if (bytepos > 15) offset += 512;
+					if (scanline > 191) offset += 512;
+				}
+				line_buffer[bytepos] = dma_read(addr + offset);
+			}
+
+			/* simulate bus master activity */
+			if (dazzler_line_sync)
+				start_bus_request(BUS_DMA_CONTINUOUS, &dazzler_busmaster);
+		}
+
+		for (bytepos=0; bytepos<num_bytes; bytepos++) {
+
+			if (format & 0x40) {	/* x4 mode */
+				/* render pixels */
+				i = line_buffer[bytepos];
+				if (hires_subrow == 0) {
+					/* first 3 scanline subrow */
+					if (i & 0x01)
+						fill_rect(bytepos * 4 * psize, vpos, psize, 1);
+					if (i & 0x02)
+						fill_rect((bytepos * 4 + 1) * psize, vpos, psize, 1);
+					if (i & 0x10)
+						fill_rect((bytepos * 4 + 2) * psize, vpos, psize, 1);
+					if (i & 0x20)
+						fill_rect((bytepos * 4 + 3) * psize, vpos, psize, 1);
+				} else {
+					/* second 3 scanline subrow */
+					if (i & 0x04)
+						fill_rect(bytepos * 4 * psize, vpos, psize, 1);
+					if (i & 0x08)
+						fill_rect((bytepos * 4 + 1) * psize, vpos, psize, 1);
+					if (i & 0x40)
+						fill_rect((bytepos * 4 + 2) * psize, vpos, psize, 1);
+					if (i & 0x80)
+						fill_rect((bytepos * 4 + 3) * psize, vpos, psize, 1);
+				}
+			}
+			else {	/* nibble mode */
+				/* first pixel */
+				i = line_buffer[bytepos] & 0x0f;
+				if (format & 0x10) {
+					set_fg_color(i);	/* color */
+				}
+				else {
+					set_fg_gray(i);		/* grayscale */
+				}
+				fill_rect(bytepos * 2 * psize, vpos, psize, 1);				
+
+				/* second pixel */
+				i = (line_buffer[bytepos] & 0xf0) >> 4;
+				if (format & 0x10) {
+					set_fg_color(i);	/* color */
+				}
+				else {
+					set_fg_gray(i);		/* grayscale */
+				}
+				fill_rect((bytepos * 2 + 1) * psize, vpos, psize, 1);				
 			}
 		}
-		for (y = 0; y < 32; y++) {
-			for (x = 32; x < 64;) {
-				i = dma_read(addr) & 0x0f;
-				if (format & 16)
-					set_fg_color(i);
-				else
-					set_fg_gray(i);
-				fill_rect(x * psize, y * psize, psize, psize);
-				x++;
-				i = (dma_read(addr) & 0xf0) >> 4;
-				if (format & 16)
-					set_fg_color(i);
-				else
-					set_fg_gray(i);
-				fill_rect(x * psize, y * psize, psize, psize);
-				x++;
-				addr++;
-			}
+
+		current_line += step;
+			
+		if (format & 0x40) {
+			/* check which subrow we're in */
+			hires_subrow = (current_line + start) / 3;
 		}
-		for (y = 32; y < 64; y++) {
-			for (x = 0; x < 32;) {
-				i = dma_read(addr) & 0x0f;
-				if (format & 16)
-					set_fg_color(i);
-				else
-					set_fg_gray(i);
-				fill_rect(x * psize, y * psize, psize, psize);
-				x++;
-				i = (dma_read(addr) & 0xf0) >> 4;
-				if (format & 16)
-					set_fg_color(i);
-				else
-					set_fg_gray(i);
-				fill_rect(x * psize, y * psize, psize, psize);
-				x++;
-				addr++;
+
+		/* post processing after last line */
+		if (current_line >= num_lines) {
+			if (dazzler_line_sync) {
+				/* collect some debug data */
+				if (row_data.frame_index < 10) {
+					row_data.ticks[row_data.frame_index][row_data.row_index] = T_end_of_row - T;
+				}
+
+				/* wait until end of row */
+				while ((T < (T_end_of_row - ticks_per_usleep)) && (cpu_state == ST_CONTIN_RUN))
+					sleep_for_us(1);
+				
+				/* collect some more debug data */
+				if (row_data.frame_index < 10) {
+					row_data.gap[row_data.frame_index][row_data.row_index] = T_end_of_row - T;
+					row_data.row_index++;
+					if (row_data.row_index == 64) {
+						row_data.row_index = 0;
+						row_data.frame_index++;
+					}
+				}				
+
+				T_end_of_row += dma_cycle;
 			}
-		}
-		for (y = 32; y < 64; y++) {
-			for (x = 32; x < 64;) {
-				i = dma_read(addr) & 0x0f;
-				if (format & 16)
-					set_fg_color(i);
-				else
-					set_fg_gray(i);
-				fill_rect(x * psize, y * psize, psize, psize);
-				x++;
-				i = (dma_read(addr) & 0xf0) >> 4;
-				if (format & 16)
-					set_fg_color(i);
-				else
-					set_fg_gray(i);
-				fill_rect(x * psize, y * psize, psize, psize);
-				x++;
-				addr++;
-			}
-		}
-	} else {		/* 512 bytes memory */
-		psize = size / 32;	/* size of one pixel for 32x32 */
-		for (y = 0; y < 32; y++) {
-			for (x = 0; x < 32;) {
-				i = dma_read(addr) & 0x0f;
-				if (format & 16)
-					set_fg_color(i);
-				else
-					set_fg_gray(i);
-				fill_rect(x * psize, y * psize, psize, psize);
-				x++;
-				i = (dma_read(addr) & 0xf0) >> 4;
-				if (format & 16)
-					set_fg_color(i);
-				else
-					set_fg_gray(i);
-				fill_rect(x * psize, y * psize, psize, psize);
-				x++;
-				addr++;
-			}
+			addr += 16;		/* new start address */
+			current_line = 0;	/* reset scanline counter */
+			flags ^= 0x80;		/* toggle line flag */
 		}
 	}
 }
@@ -711,20 +850,43 @@ static void ws_refresh(void)
 static void update_display(bool tick)
 {
 	UNUSED(tick);
+	
+	int width, height;
+	
+	Tstates_t T_end;
+
+	field = dazzler_interlaced ? EVEN : FULL;
+
+	/* handling window resize event */
+	if (window_resized) {
+		window_resized = false;
+		SDL_GetWindowSize(window, &width, &height);
+		window_size = width > height ? height : width;
+		
+		if (dazzler_descrete_scale) {
+			/* discrete scaling */
+			pscale = window_size / canvas_size;
+		}
+		else {
+			/* smooth scaling */
+			SDL_SetWindowSize(window, window_size, window_size);
+		       	SDL_RenderSetScale(renderer, window_size / 364.0, window_size / 384.0);
+		}
+	}
 
 	/* draw one frame dependent on graphics format */
 	set_fg_color(0);
 	SDL_RenderClear(renderer);
 	if (state) {		/* draw frame if on */
-		if (format & 64)
-			draw_hires();
-		else
-			draw_lowres();
+		if (dazzler_interlaced)
+			field = (field == ODD) ? EVEN : ODD;
+	       	draw_field(field);
 		SDL_RenderPresent(renderer);
 
-		/* frame done, set frame flag for 4ms */
+		/* frame done, set frame flag for 4 ms vertical blank */
 		flags = 0;
-		sleep_for_ms(4);
+		T_end = T + (f_value * 4000);
+		while ((T < T_end) && (cpu_state == ST_CONTIN_RUN)) sleep_for_us(1);
 		flags = 64;
 	} else
 		SDL_RenderPresent(renderer);
@@ -742,12 +904,11 @@ static win_funcs_t dazzler_funcs = {
 /* thread for updating the X11 display or web server */
 static void *update_thread(void *arg)
 {
-	uint64_t t;
-	long tleft;
+	Tstates_t T_end;
 
 	UNUSED(arg);
-
-	t = get_clock_us();
+	
+	field = dazzler_interlaced ? EVEN : FULL;
 
 	while (true) {	/* do forever or until canceled */
 
@@ -757,15 +918,71 @@ static void *update_thread(void *arg)
 			if (!n_flag) {
 #endif
 #ifndef WANT_SDL
+				XEvent event;
+				while (XPending(display) > 0) {
+					XNextEvent(display, &event);
+					switch(event.type) {
+					case ConfigureNotify:
+						/* check for window resize event */
+						XConfigureEvent xce = event.xconfigure;
+						if (xce.width != window_size || xce.height != window_size) {
+			                		window_size = xce.width < xce.height ? xce.width : xce.height;
+							printf("Resize event!\n\r");
+							window_resized = true;
+						}
+						break;
+					case PropertyNotify:
+						/* check for window maximize/minimize/hidden property change */
+						Atom actual_type, prop;
+						int actual_format, status;
+						unsigned long nitems, bytes_after;
+						unsigned char *dp;
+						printf("Property: %s\n\r", XGetAtomName(display, event.xproperty.atom));
+						if (!strcmp(XGetAtomName(display, event.xproperty.atom), "_NET_WM_STATE")) {
+							printf("WM state property notify event!\n\r");
+					                do {
+					                    status = XGetWindowProperty(display, window, event.xproperty.atom, 0L, 1L, 0, 4/*XA_ATOM*/,
+					                    				&actual_type, &actual_format, &nitems, &bytes_after, &dp);
+					                    if (status == Success && actual_type == 4/*XA_ATOM*/ && dp && actual_format == 32 && nitems) {
+					                        for (unsigned int i = 0; i < nitems; i++) {
+					                            prop = (((Atom*)dp)[i]);
+					                            if (prop == wm_focused) {
+					                            	printf("%d normalized\n\r", i);
+									window_resized = true;
+								    } else if ((prop == wm_maxhorz) || (prop == wm_maxvert)) {
+					                            	printf("%d maximized\n\r", i);
+									window_resized = true;
+								    } else if (prop == wm_hidden) {
+					                            	printf("%d minimized\n\r", i);
+									window_resized = true;
+								    }
+								}
+					                    }
+					                } while (bytes_after);
+					        }
+					        if (window_resized) {
+					        	XWindowAttributes attributes;
+					        	XGetWindowAttributes(display, window, &attributes);
+					        	window_size = attributes.width < attributes.height ? attributes.width : attributes.height;
+					        }
+					        break;
+					default:;
+					}
+				}
+				if (window_resized) {
+					window_resized = false;
+					pscale = window_size / canvas_size;
+					XFreePixmap(display, pixmap);
+					pixmap = XCreatePixmap(display, rootwindow, window_size, window_size, wa.depth);
+				}
 				XLockDisplay(display);
 				set_fg_color(0);
-				fill_rect(0, 0, size, size);
-				if (format & 64)
-					draw_hires();
-				else
-					draw_lowres();
+				fill_rect(0, 0, window_size, window_size);
+				if (dazzler_interlaced)
+					field = (field == ODD) ? EVEN : ODD;
+	        		draw_field(field);
 				XCopyArea(display, pixmap, window, gc, 0, 0,
-					  size, size, 0, 0);
+					  window_size, window_size, 0, 0);
 				XSync(display, True);
 				XUnlockDisplay(display);
 #endif
@@ -782,18 +999,30 @@ static void *update_thread(void *arg)
 			}
 #endif
 		}
+		else {
+#ifdef HAS_NETSERVER
+			if (!n_flag) {
+#endif
+#ifndef WANT_SDL
+				if (last_state) {
+					XLockDisplay(display);
+					XClearWindow(display, window);
+					XSync(display, True);
+					XUnlockDisplay(display);
+					last_state = false;
+				}
+#endif /* !WANT_SDL */
+#ifdef HAS_NETSERVER
+			}
+#endif
+			sleep_for_us(12129);
+		}
 
-		/* frame done, set frame flag for 4ms */
+		/* frame done, set frame flag for 4 ms vertical blank */
 		flags = 0;
-		sleep_for_ms(4);
+		T_end = T + (f_value * 4000);
+		while ((T < T_end) && (cpu_state == ST_CONTIN_RUN)) sleep_for_us(1);
 		flags = 64;
-
-		/* sleep rest to 33333us so that we get 30 fps */
-		tleft = 33333L - (long) (get_clock_us() - t);
-		if (tleft > 0)
-			sleep_for_us(tleft);
-
-		t = get_clock_us();
 	}
 
 	/* just in case it ever gets here */
@@ -824,6 +1053,7 @@ void cromemco_dazzler_ctl_out(BYTE data)
 				ws_clear();
 		}
 #endif
+		last_state = state;
 		state = true;
 #if defined(WANT_SDL) && defined(HAS_NETSERVER)
 		if (n_flag) {
@@ -842,20 +1072,11 @@ void cromemco_dazzler_ctl_out(BYTE data)
 #endif
 	} else {
 		if (state) {
+			last_state = state;
 			state = false;
+#ifdef HAS_NETSERVER
 			sleep_for_ms(50);
-#ifdef HAS_NETSERVER
-			if (!n_flag) {
-#endif
-#ifndef WANT_SDL
-				XLockDisplay(display);
-				XClearWindow(display, window);
-				XSync(display, True);
-				XUnlockDisplay(display);
-#endif
-#ifdef HAS_NETSERVER
-			} else
-				ws_clear();
+			if (n_flag) ws_clear();
 #endif
 		}
 	}
