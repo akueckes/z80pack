@@ -149,7 +149,7 @@ endif
 CFLAGS = $(CSTDS) $(COPTS) $(CWARNS)
 
 LDFLAGS = -L$(FP_DIR) -L$(CIV_DIR) $(PLAT_LDFLAGS)
-LDLIBS = $(CIV_LDLIBS) $(FP_LDLIBS) $(PLAT_LDLIBS) -lm -lpthread
+LDLIBS = $(CIV_LDLIBS) $(FP_LDLIBS) $(PLAT_LDLIBS) -lm -lpthread -l portaudio
 
 INSTALL = install
 INSTALL_PROGRAM = $(INSTALL)

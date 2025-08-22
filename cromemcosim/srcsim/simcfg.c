@@ -28,6 +28,18 @@
 #include "simmem.h"
 #include "simcfg.h"
 
+#ifdef HAS_DAZZLER
+#include "cromemco-dazzler.h"
+#endif
+
+#ifdef HAS_D7A
+#include "cromemco-d+7a.h"
+#endif
+
+#ifdef HAS_VECTOR_GRAPHICS_HIRES
+#include "vector-graphics-hires.h"
+#endif
+
 #include "log.h"
 static const char *TAG = "config";
 
@@ -86,6 +98,53 @@ void config(void)
 					     ns_port);
 					ns_port = NS_DEF_PORT;
 				}
+#endif
+#ifdef HAS_DAZZLER
+			} else if (!strcmp(t1, "dazzler_interlaced")) {
+				switch (*t2) {
+				case '0':
+					dazzler_interlaced = false;
+					break;
+				case '1':
+					dazzler_interlaced = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+			} else if (!strcmp(t1, "dazzler_line_sync")) {
+				switch (*t2) {
+				case '0':
+					dazzler_line_sync = false;
+					break;
+				case '1':
+					dazzler_line_sync = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+#endif
+#ifdef HAS_D7A
+			} else if (!strcmp(t1, "d7a_sample_rate")) {
+				d7a_sample_rate = strtol(t2, NULL, 0);
+			} else if (!strcmp(t1, "d7a_recording_limit")) {
+				d7a_recording_limit = strtol(t2, NULL, 0);
+			} else if (!strcmp(t1, "d7a_sync_adjust")) {
+				d7a_sync_adjust = atof(t2);
+			} else if (!strcmp(t1, "d7a_soundfile")) {
+				d7a_soundfile = strdup(t2);
+				for (s=d7a_soundfile; *s > 31 && *s <127; s++);
+				*s = 0;
+#endif
+#ifdef HAS_VECTOR_GRAPHICS_HIRES
+			} else if (!strcmp(t1, "vector_graphics_hires_mode")) {
+				if (!strncmp(t2, "bilevel", 7)) vector_graphics_hires_mode = 0;
+				else if (!strncmp(t2, "greyscale", 9)) vector_graphics_hires_mode = 1;
+			} else if (!strcmp(t1, "vector_graphics_hires_address")) {
+				vector_graphics_hires_address = strtol(t2, NULL, 0);
+			} else if (!strcmp(t1, "vector_graphics_hires_foreground")) {
+				strncpy(&vector_graphics_hires_foreground[1], t2, 6);
 #endif
 			} else if (!strcmp(t1, "ram")) {
 				if (num_segs >= MAXMEMMAP) {

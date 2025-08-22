@@ -54,6 +54,7 @@
 #endif
 
 #define HAS_DAZZLER	/* has simulated I/O for Cromemco Dazzler */
+#define HAS_D7A	        /* has simulated I/O for Cromemco D+7A */
 #define HAS_DISKS	/* uses disk images */
 #define HAS_CONFIG	/* has configuration files somewhere */
 #define HAS_BANKED_ROM	/* has banked RDOS ROM */
