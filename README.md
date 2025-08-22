@@ -26,9 +26,9 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - can be configured to produce a sound file as recording of an audio sequence
 - build z80pack with WANT_SDL=YES to use SDL2 framework for display, joystick and sound (recommended)
 - alternatively, build z80pack with WANT_PORTAUDIO=YES to use the PortAudio framework for audio only
-- joystick and audio emulates two JS-1 joysticks with integrated speaker
-- joystick 1 uses the lower 4 bits of port 24 for buttons (pressed=0), port 25 for x-axis and audio, and port 26 for y-axis
-- joystick 2 uses the upper 4 bits of port 24 for buttons (pressed=0), port 27 for x-axis and audio, and port 28 for y-axis
+- emulates two JS-1 joysticks with integrated speaker
+- joystick 1 uses the lower 4 bits of port 24 for buttons input (pressed=0), port 25 for x-axis input and audio output, and port 26 for y-axis input
+- joystick 2 uses the upper 4 bits of port 24 for buttons input (pressed=0), port 27 for x-axis input and audio output, and port 28 for y-axis input
 - additional config settings in the system.conf file:
 	- set d7a_sync_adjust as a floating point number to adjust the sound buffer processing speed (to reach the optimum balance between buffer overflows and underflows)
 	- set d7a_sample_rate as an integer for the sampling rate of the audio framework
