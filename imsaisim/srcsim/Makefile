@@ -16,7 +16,8 @@ MACHINE_SRCS = simcfg.c simio.c simmem.c simctl.c
 IO_SRCS = cromemco-dazzler.c cromemco-88ccc.c cromemco-d+7a.c diskmanager.c \
 	imsai-fif.c imsai-sio2.c imsai-hal.c imsai-vio.c unix_terminal.c \
 	unix_network.c netsrv.c generic-at-modem.c libtelnet.c rtc80.c \
-	simbdos.c am9511.c floatcnv.c ova.c
+	simbdos.c am9511.c floatcnv.c ova.c \
+	ads-noisemaker.c vector-graphic-hires.c
 # machine specific libraries
 CIV_LIB = $(CIV_DIR)/libcivetweb.a
 CIV_LDLIBS = -lcivetweb
@@ -150,7 +151,7 @@ endif
 CFLAGS = $(CSTDS) $(COPTS) $(CWARNS)
 
 LDFLAGS = -L$(FP_DIR) -L$(CIV_DIR) $(PLAT_LDFLAGS)
-LDLIBS = $(CIV_LDLIBS) $(FP_LDLIBS) $(PLAT_LDLIBS) -lm -lpthread
+LDLIBS = $(CIV_LDLIBS) $(FP_LDLIBS) $(PLAT_LDLIBS) -lm -lpthread -l portaudio
 
 INSTALL = install
 INSTALL_PROGRAM = $(INSTALL)

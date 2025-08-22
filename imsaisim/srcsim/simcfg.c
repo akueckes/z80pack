@@ -50,6 +50,22 @@
 #include "imsai-sio2.h"
 #include "imsai-vio.h"
 
+#ifdef HAS_DAZZLER
+#include "cromemco-dazzler.h"
+#endif
+
+#ifdef HAS_D7A
+#include "cromemco-d+7a.h"
+#endif
+
+#ifdef HAS_NOISEMAKER
+#include "ads-noisemaker.h"
+#endif
+
+#ifdef HAS_VECTOR_GRAPHIC_HIRES
+#include "vector-graphic-hires.h"
+#endif
+
 /* #define LOG_LOCAL_LEVEL LOG_DEBUG */
 #include "log.h"
 static const char *TAG = "config";
@@ -261,6 +277,78 @@ void config(void)
 					     ns_port);
 					ns_port = NS_DEF_PORT;
 				}
+#endif
+#ifdef HAS_DAZZLER
+			} else if (!strcmp(t1, "dazzler_interlaced")) {
+				switch (*t2) {
+				case '0':
+					dazzler_interlaced = false;
+					break;
+				case '1':
+					dazzler_interlaced = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+			} else if (!strcmp(t1, "dazzler_line_sync")) {
+				switch (*t2) {
+				case '0':
+					dazzler_line_sync = false;
+					break;
+				case '1':
+					dazzler_line_sync = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+			} else if (!strcmp(t1, "dazzler_descrete_scale")) {
+				switch (*t2) {
+				case '0':
+					dazzler_descrete_scale = false;
+					break;
+				case '1':
+					dazzler_descrete_scale = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+#endif
+#ifdef HAS_D7A
+			} else if (!strcmp(t1, "d7a_sample_rate")) {
+				d7a_sample_rate = strtol(t2, NULL, 0);
+			} else if (!strcmp(t1, "d7a_buffer_size")) {
+				d7a_buffer_size = strtol(t2, NULL, 0);
+			} else if (!strcmp(t1, "d7a_sync_adjust")) {
+				d7a_sync_adjust = atof(t2);
+			} else if (!strcmp(t1, "d7a_recording_limit")) {
+				d7a_recording_limit = strtol(t2, NULL, 0);
+			} else if (!strcmp(t1, "d7a_soundfile")) {
+				d7a_soundfile = strdup(t2);
+				for (s=d7a_soundfile; *s > 31 && *s <127; s++);
+				*s = 0;
+#endif
+#ifdef HAS_NOISEMAKER
+			} else if (!strcmp(t1, "noisemaker_sample_rate")) {
+				noisemaker_sample_rate = strtol(t2, NULL, 0);
+			} else if (!strcmp(t1, "noisemaker_recording_limit")) {
+				noisemaker_recording_limit = strtol(t2, NULL, 0);
+			} else if (!strcmp(t1, "noisemaker_soundfile")) {
+				noisemaker_soundfile = strdup(t2);
+				for (s=noisemaker_soundfile; *s > 31 && *s <127; s++);
+				*s = 0;
+#endif
+#ifdef HAS_VECTOR_GRAPHIC_HIRES
+			} else if (!strcmp(t1, "vector_graphic_hires_mode")) {
+				if (!strncmp(t2, "bilevel", 7)) vector_graphic_hires_mode = 0;
+				else if (!strncmp(t2, "halftone", 8)) vector_graphic_hires_mode = 1;
+				else LOGW(TAG, "invalid value for %s: %s", t1, t2);
+			} else if (!strcmp(t1, "vector_graphic_hires_address")) {
+				vector_graphic_hires_address = strtol(t2, NULL, 0);
+			} else if (!strcmp(t1, "vector_graphic_hires_foreground")) {
+				strncpy(&vector_graphic_hires_foreground[1], t2, 6);
 #endif
 			} else if (!strcmp(t1, "vio_bg")) {
 				if ((t3 = strtok(NULL, " \t,")) == NULL ||

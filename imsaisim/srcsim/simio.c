@@ -71,7 +71,15 @@
 #endif
 #ifdef HAS_DAZZLER
 #include "cromemco-dazzler.h"
+#endif
+#ifdef HAS_D7A
 #include "cromemco-d+7a.h"
+#endif
+#ifdef HAS_NOISEMAKER
+#include "ads-noisemaker.h"
+#endif
+#ifdef HAS_VECTOR_GRAPHIC_HIRES
+#include "vector-graphic-hires.h"
 #endif
 #ifdef HAS_MODEM
 #include "generic-at-modem.h"
@@ -152,7 +160,7 @@ in_func_t *const port_in[256] = {
 #endif
 	[ 20] = io_pport_in,		/* parallel port */
 	[ 21] = io_pport_in,		/*       "       */
-#ifdef HAS_DAZZLER
+#ifdef HAS_D7A
 	[ 24] = cromemco_d7a_D_in,
 	[ 25] = cromemco_d7a_A1_in,
 	[ 26] = cromemco_d7a_A2_in,
@@ -228,7 +236,7 @@ out_func_t *const port_out[256] = {
 #endif
 	[ 20] = io_no_card_out,		/* parallel port */
 	[ 21] = io_no_card_out,		/*       "       */
-#ifdef HAS_DAZZLER
+#ifdef HAS_D7A
 	[ 24] = cromemco_d7a_D_out,
 	[ 25] = cromemco_d7a_A1_out,
 	[ 26] = cromemco_d7a_A2_out,
@@ -263,6 +271,12 @@ out_func_t *const port_out[256] = {
 	[162] = apu_data_out,
 	[163] = apu_status_out,
 #endif
+#ifdef HAS_NOISEMAKER
+	[204] = ads_noisemaker_0_out,	/* ADS Noisemaker */
+	[205] = ads_noisemaker_1_out,
+	[206] = ads_noisemaker_2_out,
+	[207] = ads_noisemaker_3_out,
+#endif
 	[239] = io_no_card_out,		/* unknown card */
 	[243] = ctrl_port_out,		/* software memory control */
 	[246] = lpt_out,		/* IMSAI PTR-300 line printer */
@@ -288,8 +302,14 @@ void init_io(void)
 	imsai_sio_reset();
 	imsai_fif_reset();
 
-#ifdef HAS_DAZZLER
+#ifdef HAS_D7A
 	cromemco_d7a_init();
+#endif
+#ifdef HAS_NOISEMAKER
+	ads_noisemaker_init();
+#endif
+#ifdef HAS_VECTOR_GRAPHIC_HIRES
+	vector_graphic_hires_init();
 #endif
 #ifdef HAS_MODEM
 	modem_device_init();
@@ -327,7 +347,16 @@ void exit_io(void)
 	/* shutdown DAZZLER */
 	cromemco_dazzler_off();
 #endif
-
+#ifdef HAS_D7A
+	/* shutdown D+7A */
+	cromemco_d7a_off();
+#endif
+#ifdef HAS_NOISEMAKER
+	ads_noisemaker_off();
+#endif
+#ifdef HAS_VECTOR_GRAPHIC_HIRES
+	vector_graphic_hires_off();
+#endif
 	/* shutdown VIO */
 	imsai_vio_off();
 }
