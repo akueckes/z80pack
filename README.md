@@ -2,7 +2,7 @@
 
 z80pack is a mature emulator of multiple platforms with 8080 and Z80 CPU.
 
-This fork adds a couple of features to the original upstream project:
+This fork adds a couple of features to Udo Monk's original upstream project:
 - support for S100 sound cards with SDL2 and PortAudio audio frameworks (currently supported Cromemco D+7A and ADS Noisemaker)
 - joystick support (Cromemco D+7A) with common USB game controllers
 - more accurate Cromemco Dazzler emulation (interlaced display, line status flag, window resize etc.)
