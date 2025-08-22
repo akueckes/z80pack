@@ -2,6 +2,14 @@
 
 z80pack is a mature emulator of multiple platforms with 8080 and Z80 CPU.
 
+This fork adds a couple of features to the original upstream project:
+- support for S100 sound cards with SDL2 and PortAudio sound frameworks (currently supported Cromemco D+7A and ADS Noisemaker)
+- joystick support (Cromemco D+7A) with common USB game controllers
+- more accurate Cromemco Dazzler emulation (interlaced display, line status flag, window resize etc.)
+- support for higher resolution S100 graphics (currently supported Vector Graphic High Resolution graphics board)
+
+## Notes/limitations:
+- Sound cards, joysticks or high resolution graphics currently work in command line mode only, not with the web frontend (Javascript library needs to be updated)
 
 Full documentation is at https://www.icl1900.co.uk/unix4fun/z80pack
 
