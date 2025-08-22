@@ -3,15 +3,15 @@
 z80pack is a mature emulator of multiple platforms with 8080 and Z80 CPU.
 
 This fork adds a couple of features to the original upstream project:
-- support for S100 sound cards with SDL2 and PortAudio sound frameworks (currently supported Cromemco D+7A and ADS Noisemaker)
+- support for S100 sound cards with SDL2 and PortAudio audio frameworks (currently supported Cromemco D+7A and ADS Noisemaker)
 - joystick support (Cromemco D+7A) with common USB game controllers
 - more accurate Cromemco Dazzler emulation (interlaced display, line status flag, window resize etc.)
 - support for higher resolution S100 monochrome graphics (currently supported Vector Graphic High Resolution graphics board)
-- build switches for Cromemco Dazzler and D+7A boards have been separated, see cromemcosim and imsaisim for an example implementation
+- build switches for Cromemco Dazzler and D+7A boards have been separated in order also to allow combinations with other sound hardware, see cromemcosim and imsaisim for an example implementation
 
 ## General notes/limitations:
 - cromemcosim and imsaisim are used as examples how to enable and pre-configure the added hardware emulations
-- Sound cards, joysticks or high resolution graphics currently work in command line mode only, not with the web frontend (Javascript library needs to be updated)
+- Sound cards, joysticks or high resolution graphics currently works in command line mode only, not with the web frontend (Javascript library needs to be updated)
 
 ## Notes on Cromemco Dazzler
 - define HAS_DAZZLER in the appropriate sim.h file to enable this emulation
@@ -21,6 +21,7 @@ This fork adds a couple of features to the original upstream project:
 	- set dazzler_descrete_scale to 1 if you prefer window sizing with full multiples of the pixel count
 
 ## Notes on Cromemco D+7A
+- define HAS_D7A in the appropriate sim.h file to enable this emulation
 - the D+7A now supports both audio playback and joystick inputs
 - can be configured to produce a sound file as recording of an audio sequence
 - build z80pack with WANT_SDL=YES to use SDL2 framework for display, joystick and sound (recommended)
@@ -36,7 +37,8 @@ This fork adds a couple of features to the original upstream project:
 	- set d7a_soundfile as a string for the filename of the recording file (also enables recording)
 
 ## Notes on ADS Noisemaker
-- uses two AY-3-8910 programmes sound generators for stereo synthesis with 6 independet tone channels and 2 noise channels
+- define HAS_NOISEMAKER in the appropriate sim.h file to enable this emulation
+- uses two AY-3-8910 programmed sound generators for stereo synthesis with 6 independent tone channels and 2 noise channels
 - build z80pack with WANT_SDL=YES to use SDL2 framework for sound (recommended)
 - alternatively, build z80pack with WANT_PORTAUDIO=YES to use the PortAudio framework for sound
 - additional config settings in the system.conf file:
@@ -45,6 +47,7 @@ This fork adds a couple of features to the original upstream project:
 	- set noisemaker_soundfile as a string for the filename of the recording file (also enables recording)
 
 ## Notes on Vector Graphic HiRes Graphics
+- define HAS_VECTOR_GRAPHIC_HIRES in the appropriate sim.h file to enable this emulation
 - the Vector Graphic HiRes Graphics emulation uses a fixed window size (not resizable)
 - additional config settings in the system.conf file:
 	- set vector_graphic_hires_mode for the graphic mode either to "bilevel" or "halftone"
