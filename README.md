@@ -16,15 +16,15 @@ This fork adds a couple of features to the original upstream project:
 ## Notes on Cromemco Dazzler
 - define HAS_DAZZLER in the appropriate sim.h file to enable this emulation
 - additional config settings in the system.conf file:
--- set dazzler_interlaced to 1 to enable interlaced display for the Dazzler
--- set dazzler_line_sync to 1 to enable more accurate timing for the Dazzler (also enables the even/odd line status flag
--- set dazzler_descrete_scale to 1 if you prefer window sizing with full multiples of the pixel count
+	- set dazzler_interlaced to 1 to enable interlaced display for the Dazzler
+	- set dazzler_line_sync to 1 to enable more accurate timing for the Dazzler (also enables the even/odd line status flag
+	- set dazzler_descrete_scale to 1 if you prefer window sizing with full multiples of the pixel count
 
 ## Notes on Cromemco D+7A
 - the D+7A now supports both audio playback and joystick inputs
 - can be configured to produce a sound file as recording of an audio sequence
 - build z80pack with WANT_SDL=YES to use SDL2 framework for display, joystick and sound (recommended)
-- alternatively, build z80pack with WANT_PORTAUDIO=YES to use the PortAudio framework for sound only
+- alternatively, build z80pack with WANT_PORTAUDIO=YES to use the PortAudio framework for audio only
 - joystick and audio emulates two JS-1 joysticks with integrated speaker
 - joystick 1 uses the lower 4 bits of port 24 for buttons (pressed=0), port 25 for x-axis and audio, and port 26 for y-axis
 - joystick 2 uses the upper 4 bits of port 24 for buttons (pressed=0), port 27 for x-axis and audio, and port 28 for y-axis
