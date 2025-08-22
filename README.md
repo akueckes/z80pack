@@ -39,12 +39,14 @@ This fork adds a couple of features to the original upstream project:
 - uses two AY-3-8910 programmes sound generators for stereo synthesis with 6 independet tone channels and 2 noise channels
 - build z80pack with WANT_SDL=YES to use SDL2 framework for sound (recommended)
 - alternatively, build z80pack with WANT_PORTAUDIO=YES to use the PortAudio framework for sound
+- additional config settings in the system.conf file:
 	- set noisemaker_sample_rate as an integer for the sampling rate of the audio framework
 	- set noisemaker_recording_limit as an integer for the total number of samples to limit the size of a recording
 	- set noisemaker_soundfile as a string for the filename of the recording file (also enables recording)
 
 ## Notes on Vector Graphic HiRes Graphics
 - the Vector Graphic HiRes Graphics emulation uses a fixed window size (not resizable)
+- additional config settings in the system.conf file:
 	- set vector_graphic_hires_mode for the graphic mode either to "bilevel" or "halftone"
 	- set vector_graphic_hires_address as an integer for the start address of the video buffer in memory
 	- set vector_graphic_hires_foreground as an RGB string for the foreground color (simulates a monochrome CRT display color)
