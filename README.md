@@ -12,12 +12,13 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 ## General notes/limitations:
 - cromemcosim and imsaisim are used as examples how to enable and pre-configure the added hardware emulations
 - Sound cards, joysticks or high resolution graphics currently works in command line mode only, not with the web frontend (Javascript library needs to be updated)
+- be aware that implementations based on non-realtime multi-tasking OS like Windows or Linux will never achieve fully correct timing in emulations. The z80pack implementation tries to provide a roughly correct CPU clock in average over certain periods of time, but won't implement continuous timing accuracy, which in general limits applications which are based on tight timings with less than one millisecond accuracy
 
 ## Notes on Cromemco Dazzler
 - define HAS_DAZZLER in the appropriate sim.h file to enable this emulation
 - additional config settings in the system.conf file:
-	- set dazzler_interlaced to 1 to enable interlaced display for the Dazzler
-	- set dazzler_line_sync to 1 to enable more accurate timing for the Dazzler (also enables the even/odd line status flag
+	- set dazzler_interlaced to 1 to enable interlaced display with correct 62 Hz field rate for the Dazzler
+	- set dazzler_line_sync to 1 to enable more accurate timing for the Dazzler (also enables the even/odd line status flag)
 	- set dazzler_descrete_scale to 1 if you prefer window sizing with full multiples of the pixel count
 
 ## Notes on Cromemco D+7A
