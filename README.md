@@ -38,7 +38,7 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 	- set d7a_buffer_size as an integer for the size of the sample buffer (limits the processing delay)
 	- set d7a_soundfile as a string for the filename of the recording file (also enables recording)
  - joystick/game controller support in Linux is not standardized, sometimes it works out of the box, sometimes it requires additional configurations which might include rebuilding the kernel (this version of z80pack reports joysticks found during start-up of the emulation). Hint: check for files /dev/inputs/js* and /dev/inputs/event*. Also, passing through game controllers via WSL requires special handling.
- - some game controllers come with an integrated audio device, be aware that audio output might be routed to this device when being plugged in (no sound on all other devices)
+ - some game controllers come with an integrated audio device, be aware that audio output might be routed to this device when being plugged in (no sound on all other devices). You might think about disabling the game controller's audio device (e.g. via blacklisting).
 
 ## Notes on ADS Noisemaker
 - define HAS_NOISEMAKER in the appropriate sim.h file to enable this emulation
