@@ -174,7 +174,7 @@ static char gray15[] =  "#FFFFFF";
 static bool state, last_state;
 static WORD dma_addr, addr;
 static BYTE line_buffer[32];
-static BYTE flags = 64;
+static BYTE flags = 0x3f;
 static BYTE format;
 static int ticks_per_usleep;
 static int field;
@@ -884,10 +884,10 @@ static void update_display(bool tick)
 		SDL_RenderPresent(renderer);
 
 		/* frame done, set frame flag for 4 ms vertical blank */
-		flags = 0;
+		flags = 0x3f;
 		T_end = T + (f_value * 4000);
 		while ((T < T_end) && (cpu_state == ST_CONTIN_RUN)) sleep_for_us(1);
-		flags = 64;
+		flags |= 0x40;
 	} else
 		SDL_RenderPresent(renderer);
 }
@@ -1019,10 +1019,10 @@ static void *update_thread(void *arg)
 		}
 
 		/* frame done, set frame flag for 4 ms vertical blank */
-		flags = 0;
+		flags = 0x3f;
 		T_end = T + (f_value * 4000);
 		while ((T < T_end) && (cpu_state == ST_CONTIN_RUN)) sleep_for_us(1);
-		flags = 64;
+		flags |= 0x40;
 	}
 
 	/* just in case it ever gets here */
