@@ -64,24 +64,24 @@ In addition to Udo Munk's instructions on Ubuntu, below are the steps to bild z8
 ## Fedora
 
 1. Install the packages required for z80pack
-
-    sudo dnf group install development-tools
-    sudo dnf install git SDL2 SDL2-devel SDL2_mixer SDL2_mixer-devel SDL2_image SDL2_image-devel
-	
+```
+sudo dnf group install development-tools
+sudo dnf install git SDL2 SDL2-devel SDL2_mixer SDL2_mixer-devel SDL2_image SDL2_image-devel
+```	
 2. Get the latest z80pack sources
-
-    git clone https://github.com/akueckes/z80pack.git
-
+```
+git clone https://github.com/akueckes/z80pack.git
+```
 3. Build z80pack
-
-    cd z80pack
-    WANT_SDL=YES make
-
+```
+cd z80pack
+WANT_SDL=YES make
+```
 4. Test the emulator e.g. with Cromemco emulation
-
-    cd cromemcosim
-    ./cpm22
-
+```
+cd cromemcosim
+./cpm22
+```
 
 ## Ubuntu 
 
