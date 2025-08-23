@@ -30,12 +30,14 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - emulates two JS-1 joysticks with integrated speaker
 - joystick 1 uses the lower 4 bits of port 24 for buttons input (pressed=0), port 25 for x-axis input and audio output, and port 26 for y-axis input
 - joystick 2 uses the upper 4 bits of port 24 for buttons input (pressed=0), port 27 for x-axis input and audio output, and port 28 for y-axis input
+- audio port 25 is mapped to the left stereo audio channel, audio port 27 is mapped to the right stereo audio channel
 - additional config settings in the system.conf file:
 	- set d7a_sync_adjust as a floating point number to adjust the sound buffer processing speed (to reach the optimum balance between buffer overflows and underflows)
 	- set d7a_sample_rate as an integer for the sampling rate of the audio framework
 	- set d7a_recording_limit as an integer for the total number of samples to limit the size of a recording
 	- set d7a_buffer_size as an integer for the size of the sample buffer (limits the processing delay)
 	- set d7a_soundfile as a string for the filename of the recording file (also enables recording)
+ - joystick/game controller support in Linux is not standardized, sometimes it works out of the box, sometimes it requires additional configurations which might include rebuilding the kernel (this version of z80pack reports joysticks found during start-up). Hint: check for files /dev/inputs/js* and /dev/inputs/event*. Also, passing through game controllers via WSL requires special handling.
 
 ## Notes on ADS Noisemaker
 - define HAS_NOISEMAKER in the appropriate sim.h file to enable this emulation
@@ -55,7 +57,31 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 	- set vector_graphic_hires_address as an integer for the start address of the video buffer in memory
 	- set vector_graphic_hires_foreground as an RGB string for the foreground color (simulates a monochrome CRT display color)
 
-Full documentation is at https://www.icl1900.co.uk/unix4fun/z80pack
+Full documentation of the upstream project is at https://www.icl1900.co.uk/unix4fun/z80pack
+
+In addition to Udo Munk's instructions on Ubuntu, below are the steps to bild z80pack also on Fedora Linux based on this repo.
+
+## Fedora
+
+1. Install the packages required for z80pack
+
+  	sudo dnf group install development-tools
+	sudo dnf install git SDL2 SDL2-devel SDL2_mixer SDL2_mixer-devel SDL2_image SDL2_image-devel
+	
+2. Get the latest z80pack sources
+
+	git clone https://github.com/akueckes/z80pack.git
+
+3. Build z80pack
+
+	cd z80pack
+	WANT_SDL=YES make
+
+4. Test the emulator e.g. with Cromemco emulation
+
+	cd cromemcosim
+	./cpm22
+
 
 ## Ubuntu 
 
