@@ -17,9 +17,9 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 ## Notes on Cromemco Dazzler
 - define HAS_DAZZLER in the appropriate sim.h file to enable this emulation
 - additional config settings in the system.conf file:
-	- set dazzler_interlaced to 1 to enable interlaced display with correct 62 Hz field rate for the Dazzler
-	- set dazzler_line_sync to 1 to enable more accurate timing for the Dazzler (also enables the even/odd line status flag)
-	- set dazzler_descrete_scale to 1 if you prefer window sizing with full multiples of the pixel count
+	- set **dazzler_interlaced** to 1 to enable interlaced display with correct 62 Hz field rate for the Dazzler
+	- set **dazzler_line_sync** to 1 to enable more accurate timing for the Dazzler (also enables the even/odd line status flag)
+	- set **dazzler_descrete_scale** to 1 if you prefer window sizing with full multiples of the pixel count
 
 ## Notes on Cromemco D+7A
 - define HAS_D7A in the appropriate sim.h file to enable this emulation
@@ -32,12 +32,13 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - joystick 2 uses the upper 4 bits of port 24 for buttons input (pressed=0), port 27 for x-axis input and audio output, and port 28 for y-axis input
 - audio port 25 is mapped to the left stereo audio channel, audio port 27 is mapped to the right stereo audio channel
 - additional config settings in the system.conf file:
-	- set d7a_sync_adjust as a floating point number to adjust the sound buffer processing speed (to reach the optimum balance between buffer overflows and underflows)
-	- set d7a_sample_rate as an integer for the sampling rate of the audio framework
-	- set d7a_recording_limit as an integer for the total number of samples to limit the size of a recording
-	- set d7a_buffer_size as an integer for the size of the sample buffer (limits the processing delay)
-	- set d7a_soundfile as a string for the filename of the recording file (also enables recording)
- - joystick/game controller support in Linux is not standardized, sometimes it works out of the box, sometimes it requires additional configurations which might include rebuilding the kernel (this version of z80pack reports joysticks found during start-up of the emulation). Hint: check for files /dev/inputs/js* and /dev/inputs/event*. Also, passing through game controllers via WSL requires special handling.
+	- set **d7a_sample_rate** as an integer for the sampling rate of the audio framework
+	- set **d7a_sync_adjust** as a floating point number to adjust the sound buffer processing speed (to reach the optimum balance between buffer overflows and underflows)
+	- set **d7a_buffer_size** as an integer for the size of the sample buffer (limits the processing delay)
+  	- set **d7a_soundfile** as a string for the filename of the recording file (also enables recording)
+  	- set **d7a_recording_limit** as an integer for the total number of samples to limit the size of a recording
+  	- set **d7a_stats** to 1 for printing some audio stats when shutting down the emulator
+ - audio and joystick/game controller support in Linux is not standardized, sometimes it works out of the box, sometimes it requires additional configurations. Especially game controller support might include rebuilding the kernel (this version of z80pack reports joysticks found during start-up of the emulation). Hint: check for files /dev/inputs/js* and /dev/inputs/event*. Also, passing through game controllers via WSL requires special handling.
  - some game controllers come with an integrated audio device, be aware that audio output might be routed to this device when being plugged in (no sound on all other devices). You might think about disabling the game controller's audio device.
 
 ## Notes on ADS Noisemaker
@@ -46,17 +47,17 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - build z80pack with WANT_SDL=YES to use SDL2 framework for sound (recommended)
 - alternatively, build z80pack with WANT_PORTAUDIO=YES to use the PortAudio framework for sound
 - additional config settings in the system.conf file:
-	- set noisemaker_sample_rate as an integer for the sampling rate of the audio framework
-	- set noisemaker_recording_limit as an integer for the total number of samples to limit the size of a recording
-	- set noisemaker_soundfile as a string for the filename of the recording file (also enables recording)
+	- set **noisemaker_sample_rate** as an integer for the sampling rate of the audio framework
+ 	- set **noisemaker_soundfile** as a string for the filename of the recording file (also enables recording)
+	- set **noisemaker_recording_limit** as an integer for the total number of samples to limit the size of a recording
 
 ## Notes on Vector Graphic HiRes Graphics
 - define HAS_VECTOR_GRAPHIC_HIRES in the appropriate sim.h file to enable this emulation
 - the Vector Graphic HiRes Graphics emulation uses a fixed window size (not resizable)
 - additional config settings in the system.conf file:
-	- set vector_graphic_hires_mode for the graphic mode either to "bilevel" or "halftone"
-	- set vector_graphic_hires_address as an integer for the start address of the video buffer in memory
-	- set vector_graphic_hires_foreground as an RGB string for the foreground color (simulates a monochrome CRT display color)
+	- set **vector_graphic_hires_mode** for the graphic mode either to "bilevel" or "halftone"
+	- set **vector_graphic_hires_address** as an integer for the start address of the video buffer in memory
+	- set **vector_graphic_hires_fg** as an tripe of R,G,B values between 0 and 255 for the foreground color (simulates a monochrome CRT display color)
 
 Full documentation of the upstream project is at https://www.icl1900.co.uk/unix4fun/z80pack
 
