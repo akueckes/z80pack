@@ -38,6 +38,7 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 	- set d7a_buffer_size as an integer for the size of the sample buffer (limits the processing delay)
 	- set d7a_soundfile as a string for the filename of the recording file (also enables recording)
  - joystick/game controller support in Linux is not standardized, sometimes it works out of the box, sometimes it requires additional configurations which might include rebuilding the kernel (this version of z80pack reports joysticks found during start-up of the emulation). Hint: check for files /dev/inputs/js* and /dev/inputs/event*. Also, passing through game controllers via WSL requires special handling.
+ - some game controllers come with an integrated audio device, be aware that audio output might be routed to this device when being plugged in (no sound on all other devices). You might think about disabling the game controller's audio device.
 
 ## Notes on ADS Noisemaker
 - define HAS_NOISEMAKER in the appropriate sim.h file to enable this emulation
@@ -60,6 +61,13 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 Full documentation of the upstream project is at https://www.icl1900.co.uk/unix4fun/z80pack
 
 In addition to Udo Munk's instructions on Ubuntu, below are the steps to bild z80pack also on Fedora Linux based on this repo.
+
+## WSL notes
+Since the later revisions, the use of z80pack under MS Windows is normally achieved via WSL. Passing through audio to the host hardware normally is not much of a problem, since with Windows 11, WSL passes audio via a separate PulseAudio server to the Windows audio system. For using USB game controllers within WSL, you have to bind and attach the game controller with usbipd-win to the running WSL instance.
+
+There are, however, a couple of caveats. First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Second, the WSL Linux kernel probably will not be configured out-of-the-box for supporting game controllers. Consequently, you will have to change the kernel configuration, rebuild the kernel and activate it for WSL.
+
+If a USB game controller also integrates audio hardware, your Linux in the WSL instance possibly automatically activates its own audio server such as PipeWire (if installed) for handling the newly detected audio hardware, which cuts the connection to WSL's PulseAudio server, so that all audio output will be routed to the game controller's audio hardware instead of the host's Windows audio system. You might need to deactivate the guest Linux' own audio server in order to re-establish the use of WSL's PulseAudio server.
 
 ## Fedora
 
