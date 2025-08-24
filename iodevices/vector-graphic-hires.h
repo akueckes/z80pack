@@ -22,7 +22,7 @@
 
 extern int vector_graphic_hires_mode;
 extern int vector_graphic_hires_address;
-extern char *vector_graphic_hires_foreground;
+extern uint8_t vector_graphic_hires_fg_color[3];
 
 void vector_graphic_hires_init(void);
 void vector_graphic_hires_off(void);

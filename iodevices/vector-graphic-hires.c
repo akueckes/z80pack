@@ -56,7 +56,7 @@ char default_hires_foreground[] = "00ff00";	/* default foreground color */
 
 int vector_graphic_hires_mode = DEFAULT_HIRES_MODE;
 int vector_graphic_hires_address = DEFAULT_HIRES_ADDRESS;
-char *vector_graphic_hires_foreground = default_hires_foreground;
+uint8_t vector_graphic_hires_fg_color[3] = {0, 255, 0};
 
 static int w_width = 512;
 static int w_height = 480;
@@ -115,25 +115,19 @@ static void open_display(void)
 {
 #ifdef WANT_SDL
 	/* foreground color */ 
-	char *index = vector_graphic_hires_foreground;
-	long color;
 	int i;
 	float r,g,b;
-	if (strlen(index) > 5) {
-		if (*index == '#') index++;
-		color = strtol(index, NULL, 16);
-		r = ((color >> 16) % 256) / 255.0;
-		g = ((color >> 8) % 256) / 255.0;
-		b = (color % 256) / 255.0;
-		for (i=0; i<16; i++) {
-			grays[i][0] = (uint8_t) i*0x11*r;
-			grays[i][1] = (uint8_t) i*0x11*g;
-			grays[i][2] = (uint8_t) i*0x11*b;
-		}
-		colors[1][0] = r * 255; 
-		colors[1][1] = g * 255; 
-		colors[1][2] = b * 255; 
+	r = vector_graphic_hires_fg_color[0] / 255.0;
+	g = vector_graphic_hires_fg_color[1] / 255.0;
+	b = vector_graphic_hires_fg_color[2] / 255.0;
+	for (i=0; i<16; i++) {
+		grays[i][0] = (uint8_t) i*0x11*r;
+		grays[i][1] = (uint8_t) i*0x11*g;
+		grays[i][2] = (uint8_t) i*0x11*b;
 	}
+	colors[1][0] = r * 255; 
+	colors[1][1] = g * 255; 
+	colors[1][2] = b * 255; 
 	
 	/* create window */
 	window = SDL_CreateWindow("Vector Graphic HiRes",
@@ -188,15 +182,9 @@ static void open_display(void)
 
 	/* halftone shades */
 	for (i=0; i<16; i++) {
-		r_str[2] = vector_graphic_hires_foreground[1];
-		r_str[3] = vector_graphic_hires_foreground[2];
-		g_str[2] = vector_graphic_hires_foreground[3];
-		g_str[3] = vector_graphic_hires_foreground[4];
-		b_str[2] = vector_graphic_hires_foreground[5];
-		b_str[3] = vector_graphic_hires_foreground[6];
-		r = (strtol(r_str, NULL, 0) * i) / 16;
-		g = (strtol(g_str, NULL, 0) * i) / 16;
-		b = (strtol(b_str, NULL, 0) * i) / 16;
+		r = (vector_graphic_hires_fg_color[0] * i) / 16;
+		g = (vector_graphic_hires_fg_color[1] * i) / 16;
+		b = (vector_graphic_hires_fg_color[2] * i) / 16;
 		sprintf(rgb_str, "#%02X%02X%02X", r, g, b);
 		XParseColor(display, colormap, rgb_str, &grays[i]);
 		XAllocColor(display, colormap, &grays[i]);

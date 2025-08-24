@@ -485,7 +485,7 @@ void ayumi_remove_dc(struct ayumi* ay) {
 */
 void psg_out(struct ayumi* ay, int register_select, BYTE data)
 {
-    printf("\nreg %d data %02X\n\r", register_select, data);
+//    printf("\nreg %d data %02X\n\r", register_select, data);
         
     switch(register_select) {
         case 0: /* channel A fine tune */
@@ -772,16 +772,22 @@ void ads_noisemaker_init(void) {
 #endif
 
 #ifdef WANT_SDL
-    if (!(device_id = sdl_audio_init())) {
-    	    LOG(TAG, "ADS Noisemaker: Could initialize\r\n");
+    if ((device_id = sdl_audio_init())) {
+    	    LOG(TAG, "ADS Noisemaker: SDL audio initialized & ready to use\r\n");
+    }
+    else {
+    	    LOG(TAG, "ADS Noisemaker: Could not initialize SDL audio\r\n");
     	    return;
     }
 #endif
 
 #ifdef WANT_PORTAUDIO
     /* initialize PortAudio */
-    if (portaudio_init() < 0) {
-    	    LOG(TAG, "ADS Noisemaker: Could not initialize\r\n");
+    if (portaudio_init() >= 0) {
+    	    LOG(TAG, "ADS Noisemaker: PortAudio initialized & ready to use\r\n");
+    }
+    else {
+    	    LOG(TAG, "ADS Noisemaker: Could not initialize PortAudio\r\n");
     	    return;
     };
 #endif
@@ -802,8 +808,6 @@ void ads_noisemaker_init(void) {
     ayumi_set_volume(ay1, 0, 0xf);
     ayumi_set_mixer(ay2, 0, 0, 1, 0);
     ayumi_set_volume(ay2, 0, 0xf);
-
-    LOG(TAG, "ADS Noisemaker initialized\r\n");
 }
 
 void ads_noisemaker_off(void)
@@ -887,8 +891,6 @@ void ads_noisemaker_off(void)
 #ifdef WANT_SDL
     sdl_audio_off(device_id);
 #endif
-
-    printf("ADS Noisemaker shut down\r\n");
 }
 
 static void ads_noisemaker_out(BYTE port, BYTE data)

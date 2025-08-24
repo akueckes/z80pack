@@ -43,5 +43,6 @@ extern long d7a_buffer_size;
 extern double d7a_sync_adjust;
 extern char *d7a_soundfile;
 extern long d7a_recording_limit;
+extern bool d7a_stats;
 
 #endif /* !CROMEMCO_DPLUS7A_INC */

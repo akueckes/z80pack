@@ -71,6 +71,7 @@ long d7a_sample_rate = DEFAULT_SAMPLE_RATE;
 long d7a_recording_limit = DEFAULT_RECORDING_LIMIT;
 long d7a_buffer_size = DEFAULT_BUFFER_SIZE;
 char *d7a_soundfile = NULL;
+bool d7a_stats = false;
 
 typedef struct {
 	char sample[NUM_CHANNELS];		/* actual sample for each channel */
@@ -522,7 +523,7 @@ void cromemco_d7a_init(void)
 	if (d7a_recording_limit > 0) {
 		wave_buffer = malloc(d7a_recording_limit * sizeof(DebugData));
 		if (wave_buffer == NULL) {
-			fprintf(stderr, "Could not allocate enough memory for recording, reduce recording limit\n");
+			fprintf(stderr, "Could not allocate enough memory for recording, please reduce recording limit\n");
 		};
 	};
 
@@ -537,6 +538,17 @@ void cromemco_d7a_init(void)
 	}
 
 #ifdef WANT_SDL
+    if (sdl_num_joysticks > 0) {
+    	if (sdl_num_joysticks == 1) {
+    	    LOG(TAG, "D+7A: 1 joystick connected\r\n");
+    	}
+    	else {
+    	    LOG(TAG, "D+7A: %d joysticks connected\r\n", sdl_num_joysticks);
+    	}
+    }
+    else {
+    	    LOG(TAG, "D+7A: No joystick connected\r\n");
+    }
     if ((device_id = sdl_audio_init())) {
     	    LOG(TAG, "D+7A: SDL audio initialized & ready to use\r\n");
     }
@@ -639,9 +651,13 @@ void cromemco_d7a_off(void)
 //		    printf("index=%d %d %d %d %d %lu %lu %d\n\r", i, wave_buffer[i].sample_1, wave_buffer[i].sample_2,
 //		        wave_buffer[i].count_1, wave_buffer[i].count_2, wave_buffer[i].tick_1 - wave_buffer[i-1].tick_1, wave_buffer[i].tick_2 - wave_buffer[i-1].tick_2, wave_buffer[i].status);
 //		}
-	
-	printf("D7A stats: underflows: %d overflows: %d dropouts: %d timeouts: %d\n",
+
+	if (d7a_stats) {
+    	    LOG(TAG, "D7A stats: underflows: %d overflows: %d dropouts: %d timeouts: %d\n",
 		underflows, overflows, dropouts, timeouts);
+//	printf("D7A stats: underflows: %d overflows: %d dropouts: %d timeouts: %d\n",
+//		underflows, overflows, dropouts, timeouts);
+	}
 	
 	if (wave_buffer) free(wave_buffer);
 

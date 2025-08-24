@@ -41,6 +41,7 @@ typedef struct window {
 	win_funcs_t *funcs;
 } window_t;
 
+int sdl_num_joysticks = 0;
 int sdl_joystick_0_x_axis = 0;
 int sdl_joystick_0_y_axis = 0;
 int sdl_joystick_1_x_axis = 0;
@@ -57,7 +58,7 @@ int main(int argc, char *argv[])
 	bool quit = false, tick;
 	SDL_Thread *sim_thread;
 	uint64_t t1, t2;
-	int i, status, sdl_num_joysticks;
+	int i, status;
 	args_t args = {argc, argv};
 
 	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
@@ -68,7 +69,6 @@ int main(int argc, char *argv[])
 
 	/* check for joysticks */
 	sdl_num_joysticks = SDL_NumJoysticks();
-	printf("\n%d joystick(s) connected\n\n\r", sdl_num_joysticks);
 	for (i=0; i<sdl_num_joysticks; i++) {
         	if (SDL_JoystickOpen(i) == NULL)
             		fprintf(stderr, "SDL: error reading joystick %d\n", i);

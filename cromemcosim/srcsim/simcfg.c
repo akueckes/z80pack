@@ -124,6 +124,18 @@ void config(void)
 					LOGW(TAG, "invalid value for %s: %s", t1, t2);
 					break;
 				}
+			} else if (!strcmp(t1, "dazzler_descrete_scale")) {
+				switch (*t2) {
+				case '0':
+					dazzler_descrete_scale = false;
+					break;
+				case '1':
+					dazzler_descrete_scale = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
 #endif
 #ifdef HAS_D7A
 			} else if (!strcmp(t1, "d7a_sample_rate")) {
@@ -136,6 +148,18 @@ void config(void)
 				d7a_soundfile = strdup(t2);
 				for (s=d7a_soundfile; *s > 31 && *s <127; s++);
 				*s = 0;
+			} else if (!strcmp(t1, "d7a_stats")) {
+				switch (*t2) {
+				case '0':
+					d7a_stats = false;
+					break;
+				case '1':
+					d7a_stats = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
 #endif
 #ifdef HAS_VECTOR_GRAPHICS_HIRES
 			} else if (!strcmp(t1, "vector_graphics_hires_mode")) {
@@ -144,7 +168,30 @@ void config(void)
 			} else if (!strcmp(t1, "vector_graphics_hires_address")) {
 				vector_graphics_hires_address = strtol(t2, NULL, 0);
 			} else if (!strcmp(t1, "vector_graphics_hires_foreground")) {
-				strncpy(&vector_graphics_hires_foreground[1], t2, 6);
+			} else if (!strcmp(t1, "vector_graphic_hires_fg")) {
+				if ((t3 = strtok(NULL, " \t,")) == NULL ||
+				    (t4 = strtok(NULL, " \t,")) == NULL) {
+					LOGW(TAG, "missing parameter for %s", t1);
+					continue;
+				}
+				v1 = strtol(t2, NULL, 0);
+				if (v1 < 0 || v1 > 255) {
+					LOGW(TAG, "invalid red component %d", v1);
+					continue;
+				}
+				v2 = strtol(t3, NULL, 0);
+				if (v2 < 0 || v2 > 255) {
+					LOGW(TAG, "invalid green component %d", v2);
+					continue;
+				}
+				v3 = strtol(t4, NULL, 0);
+				if (v3 < 0 || v3 > 255) {
+					LOGW(TAG, "invalid blue component %d", v3);
+					continue;
+				}
+				vector_graphic_hires_fg_color[0] = v1;
+				vector_graphic_hires_fg_color[1] = v2;
+				vector_graphic_hires_fg_color[2] = v3;
 #endif
 			} else if (!strcmp(t1, "ram")) {
 				if (num_segs >= MAXMEMMAP) {

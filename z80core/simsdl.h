@@ -22,6 +22,7 @@ typedef struct win_funcs {
 extern int simsdl_create(win_funcs_t *funcs);
 extern void simsdl_destroy(int i);
 
+extern int sdl_num_joysticks;
 extern int sdl_joystick_0_x_axis;
 extern int sdl_joystick_0_y_axis;
 extern int sdl_joystick_1_x_axis;
