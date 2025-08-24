@@ -57,7 +57,7 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - additional config settings in the system.conf file:
 	- set **vector_graphic_hires_mode** for the graphic mode either to "bilevel" or "halftone"
 	- set **vector_graphic_hires_address** as an integer for the start address of the video buffer in memory
-	- set **vector_graphic_hires_fg** as an tripe of R,G,B values between 0 and 255 for the foreground color (simulates a monochrome CRT display color)
+	- set **vector_graphic_hires_fg** as a triple of R,G,B values each between 0 and 255 for the foreground color (simulates a monochrome CRT display color)
 
 Full documentation of the upstream project is at https://www.icl1900.co.uk/unix4fun/z80pack
 
