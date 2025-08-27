@@ -77,7 +77,7 @@ In general, the X server integrated in WSL 2 (WSLg) is special in certain aspect
 1. Install the packages required for z80pack
 ```
 sudo dnf group install development-tools
-sudo dnf install git SDL2 SDL2-devel SDL2_mixer SDL2_mixer-devel SDL2_image SDL2_image-devel
+sudo dnf install git SDL2 SDL2-devel SDL2_mixer SDL2_mixer-devel SDL2_image SDL2_image-devel -libXrender-devel
 ```	
 2. Get the latest z80pack sources
 ```
@@ -99,7 +99,7 @@ cd cromemcosim
 ### Building
 First install the needed dependencies for X11:
 
-    sudo apt install build-essential libglu1-mesa-dev libjpeg9-dev
+    sudo apt install build-essential libglu1-mesa-dev libjpeg9-dev libxrender-dev
 
 or for SDL2:
 
