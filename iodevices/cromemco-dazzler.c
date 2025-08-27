@@ -38,9 +38,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <string.h>
-#if 0
 #include <X11/extensions/Xrender.h>
-#endif
 #endif
 
 #include "sim.h"
@@ -74,7 +72,7 @@ static const char *TAG = "DAZZLER";
 /* parameters configurable in system.conf */
 bool dazzler_interlaced = false;	/* non-interlaced display by default */
 bool dazzler_line_sync = false;		/* no line sync by default */
-bool dazzler_descrete_scale = false;	/* no decsrete window scaling by default */
+bool dazzler_discrete_scale = false;	/* no decsrete window scaling by default */
 
 /* SDL2/X11 stuff */
 #define WSIZE 384
@@ -125,6 +123,11 @@ static uint8_t grays[16][3] = {
 	{ 0xFF, 0xFF, 0xFF }
 };
 #else /* !WANT_SDL */
+static int has_xrender_extension = 0;
+static XRenderPictFormat *pict_format;
+static Picture canvas_pic;
+static Picture window_pic;
+static double scale_factor;
 static Display *display;
 static Window window;
 static int screen;
@@ -168,6 +171,14 @@ static char gray12[] =  "#CCCCCC";
 static char gray13[] =  "#DDDDDD";
 static char gray14[] =  "#EEEEEE";
 static char gray15[] =  "#FFFFFF";
+
+int errorHandler(Display *dpy, XErrorEvent *err)
+{
+    char buf[256];
+    XGetErrorText(dpy, err->error_code, buf, 256);
+    fprintf(stderr, "Error: %s\r\n", buf);
+    return 0;
+}
 #endif /* !WANT_SDL */
 
 /* DAZZLER stuff */
@@ -227,7 +238,9 @@ static void open_display(void)
 #else /* !WANT_SDL */
 	XSizeHints *size_hints = XAllocSizeHints();
 	Atom wm_delete_window;
+    	int first_event, first_error;
 	
+	XSetErrorHandler(errorHandler);
 	display = XOpenDisplay(NULL);
 	XLockDisplay(display);
 	screen = DefaultScreen(display);
@@ -237,26 +250,26 @@ static void open_display(void)
 				     window_size, window_size, 1, 0, 0);
 	XStoreName(display, window, "Cromemco DAzzLER");
 	size_hints->flags = PSize | PMinSize | PAspect | PResizeInc;
-	size_hints->min_width = canvas_size;
-	size_hints->min_height = canvas_size;
-	size_hints->base_width = canvas_size;
-	size_hints->base_height = canvas_size;
+	size_hints->min_width = WSIZE;
+	size_hints->min_height = WSIZE;
+	size_hints->base_width = WSIZE;
+	size_hints->base_height = WSIZE;
 	size_hints->min_aspect.x = 1;
 	size_hints->min_aspect.y = 1;
 	size_hints->max_aspect.x = 1;
 	size_hints->max_aspect.y = 1;
-	size_hints->width_inc = 10;
-	size_hints->height_inc = 10;
+	size_hints->width_inc = 1;
+	size_hints->height_inc = 1;
 	XSetWMNormalHints(display, window, size_hints);
 	XFree(size_hints);
 
-	wm_focused = XInternAtom(display, "_NET_WM_STATE_FOCUSED", 1);
-    	wm_maxhorz = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", 1);
-    	wm_maxvert = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", 1);
-    	wm_hidden = XInternAtom(display, "_NET_WM_STATE_HIDDEN", 1);		
+	wm_focused = XInternAtom(display, "_NET_WM_STATE_FOCUSED", 0);
+    	wm_maxhorz = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", 0);
+    	wm_maxvert = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", 0);
+    	wm_hidden = XInternAtom(display, "_NET_WM_STATE_HIDDEN", 0);		
 	wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
 	XSetWMProtocols(display, window, &wm_delete_window, 1);
-
+	
 	XSelectInput(display, window, StructureNotifyMask | PropertyChangeMask);
 
 	colormap = DefaultColormap(display, 0);
@@ -330,6 +343,26 @@ static void open_display(void)
 	XAllocColor(display, colormap, &grays[14]);
 	XParseColor(display, colormap, gray15, &grays[15]);
 	XAllocColor(display, colormap, &grays[15]);
+
+	/* XRenderExtension stuff */
+    	if (XRenderQueryExtension(display, &first_event, &first_error)) {
+		XTransform transform;
+		has_xrender_extension = 1;
+		pict_format = XRenderFindVisualFormat(display, DefaultVisual(display, screen));
+		canvas_pic = XRenderCreatePicture(display, pixmap, pict_format, 0, NULL);
+		window_pic = XRenderCreatePicture(display, window, pict_format, 0, NULL);
+		scale_factor = 1.0;					
+		transform.matrix[0][0] = XDoubleToFixed(scale_factor);
+		transform.matrix[0][1] = XDoubleToFixed(0);
+		transform.matrix[0][2] = XDoubleToFixed(0);
+		transform.matrix[1][0] = XDoubleToFixed(0);
+		transform.matrix[1][1] = XDoubleToFixed(scale_factor);
+		transform.matrix[1][2] = XDoubleToFixed(0);
+		transform.matrix[2][0] = XDoubleToFixed(0);
+		transform.matrix[2][1] = XDoubleToFixed(0);
+		transform.matrix[2][2] = XDoubleToFixed(1);					
+		XRenderSetPictureTransform(display, canvas_pic, &transform);
+	}
 
 	XMapWindow(display, window);
 	XUnlockDisplay(display);
@@ -688,23 +721,23 @@ static void draw_field(int field)
 				if (hires_subrow == 0) {
 					/* first 3 scanline subrow */
 					if (i & 0x01)
-						fill_rect(bytepos * 4 * psize, vpos, psize, 1);
+						fill_rect(bytepos * 4 * psize, vpos, psize, pscale);
 					if (i & 0x02)
-						fill_rect((bytepos * 4 + 1) * psize, vpos, psize, 1);
+						fill_rect((bytepos * 4 + 1) * psize, vpos, psize, pscale);
 					if (i & 0x10)
-						fill_rect((bytepos * 4 + 2) * psize, vpos, psize, 1);
+						fill_rect((bytepos * 4 + 2) * psize, vpos, psize, pscale);
 					if (i & 0x20)
-						fill_rect((bytepos * 4 + 3) * psize, vpos, psize, 1);
+						fill_rect((bytepos * 4 + 3) * psize, vpos, psize, pscale);
 				} else {
 					/* second 3 scanline subrow */
 					if (i & 0x04)
-						fill_rect(bytepos * 4 * psize, vpos, psize, 1);
+						fill_rect(bytepos * 4 * psize, vpos, psize, pscale);
 					if (i & 0x08)
-						fill_rect((bytepos * 4 + 1) * psize, vpos, psize, 1);
+						fill_rect((bytepos * 4 + 1) * psize, vpos, psize, pscale);
 					if (i & 0x40)
-						fill_rect((bytepos * 4 + 2) * psize, vpos, psize, 1);
+						fill_rect((bytepos * 4 + 2) * psize, vpos, psize, pscale);
 					if (i & 0x80)
-						fill_rect((bytepos * 4 + 3) * psize, vpos, psize, 1);
+						fill_rect((bytepos * 4 + 3) * psize, vpos, psize, pscale);
 				}
 			}
 			else {	/* nibble mode */
@@ -716,7 +749,7 @@ static void draw_field(int field)
 				else {
 					set_fg_gray(i);		/* grayscale */
 				}
-				fill_rect(bytepos * 2 * psize, vpos, psize, 1);				
+				fill_rect(bytepos * 2 * psize, vpos, psize, pscale);
 
 				/* second pixel */
 				i = (line_buffer[bytepos] & 0xf0) >> 4;
@@ -726,7 +759,7 @@ static void draw_field(int field)
 				else {
 					set_fg_gray(i);		/* grayscale */
 				}
-				fill_rect((bytepos * 2 + 1) * psize, vpos, psize, 1);				
+				fill_rect((bytepos * 2 + 1) * psize, vpos, psize, pscale);
 			}
 		}
 
@@ -863,14 +896,18 @@ static void update_display(bool tick)
 		SDL_GetWindowSize(window, &width, &height);
 		window_size = width > height ? height : width;
 		
-		if (dazzler_descrete_scale) {
+		if (dazzler_discrete_scale) {
 			/* discrete scaling */
-			pscale = window_size / canvas_size;
+			pscale = window_size / WSIZE;
+			if (pscale <1) pscale = 1;
+			canvas_size = pscale * WSIZE;
+			window_size = canvas_size;
+			SDL_SetWindowSize(window, window_size, window_size);
 		}
 		else {
 			/* smooth scaling */
 			SDL_SetWindowSize(window, window_size, window_size);
-		       	SDL_RenderSetScale(renderer, window_size / 364.0, window_size / 384.0);
+		       	SDL_RenderSetScale(renderer, (double)window_size / WSIZE, (double)window_size / WSIZE);
 		}
 	}
 
@@ -900,6 +937,46 @@ static win_funcs_t dazzler_funcs = {
 };
 #endif
 
+#ifndef WANT_SDL
+void process_event()
+{
+	XEvent event;
+	Atom actual_type, prop;
+	int actual_format, status;
+	unsigned long nitems, bytes_after;
+	unsigned char *dp;
+
+	while (XCheckWindowEvent(display, window, StructureNotifyMask | PropertyChangeMask, &event)) {
+		switch(event.type) {
+		case ConfigureNotify:
+			/* check for window resize event */
+			XConfigureEvent xce = event.xconfigure;
+			if ((xce.width != window_size) || (xce.height != window_size)){
+				window_resized = true;
+			}
+			break;
+		case PropertyNotify:
+			/* check for window maximize/minimize/normalize property change */
+			sleep_for_ms(1);
+			if (!strcmp(XGetAtomName(display, event.xproperty.atom), "_NET_WM_STATE")) {
+	                    status = XGetWindowProperty(display, window, event.xproperty.atom, 0L, 1L, 0, 4,
+	                    				&actual_type, &actual_format, &nitems, &bytes_after, &dp);
+	                    if ((status == Success) && (actual_type == 4) && dp && (actual_format == 32) && nitems) {
+	                        for (unsigned int i = 0; i < nitems; i++) {
+	                            prop = (((Atom*)dp)[i]);
+	                            if ((prop == wm_focused) || (prop == wm_maxhorz) || (prop == wm_maxvert)) {
+					window_resized = true;
+				    }
+				}
+			    }
+		        }
+		        break;
+		default:;
+		}
+	}
+}
+#endif
+
 #if !defined(WANT_SDL) || defined(HAS_NETSERVER)
 /* thread for updating the X11 display or web server */
 static void *update_thread(void *arg)
@@ -916,76 +993,61 @@ static void *update_thread(void *arg)
 		if (state) {		/* draw frame if on */
 #ifdef HAS_NETSERVER
 			if (!n_flag) {
-#endif
+#endif /* HAS_NETSERVER */
 #ifndef WANT_SDL
-				XEvent event;
-				while (XPending(display) > 0) {
-					XNextEvent(display, &event);
-					switch(event.type) {
-					case ConfigureNotify:
-						/* check for window resize event */
-						XConfigureEvent xce = event.xconfigure;
-						if (xce.width != window_size || xce.height != window_size) {
-			                		window_size = xce.width < xce.height ? xce.width : xce.height;
-							printf("Resize event!\n\r");
-							window_resized = true;
-						}
-						break;
-					case PropertyNotify:
-						/* check for window maximize/minimize/hidden property change */
-						Atom actual_type, prop;
-						int actual_format, status;
-						unsigned long nitems, bytes_after;
-						unsigned char *dp;
-						printf("Property: %s\n\r", XGetAtomName(display, event.xproperty.atom));
-						if (!strcmp(XGetAtomName(display, event.xproperty.atom), "_NET_WM_STATE")) {
-							printf("WM state property notify event!\n\r");
-					                do {
-					                    status = XGetWindowProperty(display, window, event.xproperty.atom, 0L, 1L, 0, 4/*XA_ATOM*/,
-					                    				&actual_type, &actual_format, &nitems, &bytes_after, &dp);
-					                    if (status == Success && actual_type == 4/*XA_ATOM*/ && dp && actual_format == 32 && nitems) {
-					                        for (unsigned int i = 0; i < nitems; i++) {
-					                            prop = (((Atom*)dp)[i]);
-					                            if (prop == wm_focused) {
-					                            	printf("%d normalized\n\r", i);
-									window_resized = true;
-								    } else if ((prop == wm_maxhorz) || (prop == wm_maxvert)) {
-					                            	printf("%d maximized\n\r", i);
-									window_resized = true;
-								    } else if (prop == wm_hidden) {
-					                            	printf("%d minimized\n\r", i);
-									window_resized = true;
-								    }
-								}
-					                    }
-					                } while (bytes_after);
-					        }
-					        if (window_resized) {
-					        	XWindowAttributes attributes;
-					        	XGetWindowAttributes(display, window, &attributes);
-					        	window_size = attributes.width < attributes.height ? attributes.width : attributes.height;
-					        }
-					        break;
-					default:;
-					}
-				}
+				process_event();
 				if (window_resized) {
+					XGetWindowAttributes(display, window, &wa);
+					window_size = wa.width < wa.height ? wa.width : wa.height;
+					if (dazzler_discrete_scale) {
+						pscale = window_size / WSIZE;
+						if (pscale < 1) pscale = 1;
+						if (canvas_size != (pscale * WSIZE)) {
+							window_size = pscale * WSIZE;
+							canvas_size = pscale * WSIZE;
+							XFreePixmap(display, pixmap);
+							pixmap = XCreatePixmap(display, rootwindow, canvas_size, canvas_size, wa.depth);
+							XResizeWindow(display, window, window_size, window_size);
+						}
+					}
+					else if (has_xrender_extension) {
+						/* make sure we have a square window even if the wm ignores the size hints*/
+						XResizeWindow(display, window, window_size, window_size);
+						XTransform transform;
+						scale_factor = (double)canvas_size / (double)window_size;					
+						transform.matrix[0][0] = XDoubleToFixed(scale_factor);
+						transform.matrix[0][1] = XDoubleToFixed(0);
+						transform.matrix[0][2] = XDoubleToFixed(0);
+						transform.matrix[1][0] = XDoubleToFixed(0);
+						transform.matrix[1][1] = XDoubleToFixed(scale_factor);
+						transform.matrix[1][2] = XDoubleToFixed(0);
+						transform.matrix[2][0] = XDoubleToFixed(0);
+						transform.matrix[2][1] = XDoubleToFixed(0);
+						transform.matrix[2][2] = XDoubleToFixed(1);					
+						XRenderSetPictureTransform(display, canvas_pic, &transform);
+					} else {
+						/* prohibit resize */
+						window_size = canvas_size;
+						XResizeWindow(display, window, window_size, window_size);
+					}
 					window_resized = false;
-					pscale = window_size / canvas_size;
-					XFreePixmap(display, pixmap);
-					pixmap = XCreatePixmap(display, rootwindow, window_size, window_size, wa.depth);
 				}
 				XLockDisplay(display);
 				set_fg_color(0);
-				fill_rect(0, 0, window_size, window_size);
+				fill_rect(0, 0, canvas_size, canvas_size);
 				if (dazzler_interlaced)
 					field = (field == ODD) ? EVEN : ODD;
 	        		draw_field(field);
-				XCopyArea(display, pixmap, window, gc, 0, 0,
-					  window_size, window_size, 0, 0);
+				if (has_xrender_extension && !dazzler_discrete_scale) {
+				        XRenderComposite(display, PictOpSrc, canvas_pic, 0, window_pic,
+				                         0, 0, 0, 0, 0, 0, window_size, window_size);
+				}
+				else {
+					XCopyArea(display, pixmap, window, gc, 0, 0, canvas_size, canvas_size, 0, 0);
+				}
 				XSync(display, True);
 				XUnlockDisplay(display);
-#endif
+#endif /* !WANT_SDL */
 #ifdef HAS_NETSERVER
 			} else {
 				if (net_device_alive(DEV_DZLR)) {
@@ -997,12 +1059,12 @@ static void *update_thread(void *arg)
 					}
 				}
 			}
-#endif
+#endif /* HAS_NETSERVER */
 		}
 		else {
 #ifdef HAS_NETSERVER
 			if (!n_flag) {
-#endif
+#endif /* HAS_NETSERVER */
 #ifndef WANT_SDL
 				if (last_state) {
 					XLockDisplay(display);
@@ -1014,7 +1076,7 @@ static void *update_thread(void *arg)
 #endif /* !WANT_SDL */
 #ifdef HAS_NETSERVER
 			}
-#endif
+#endif /* HAS_NETSERVER */
 			sleep_for_us(12129);
 		}
 

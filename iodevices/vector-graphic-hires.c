@@ -140,9 +140,6 @@ static void open_display(void)
 	Window rootwindow;
 	XSizeHints *size_hints = XAllocSizeHints();
 	Atom wm_delete_window;
-	char r_str[] = "0x00"; 
-	char g_str[] = "0x00"; 
-	char b_str[] = "0x00"; 
 	char rgb_str[8];
 	int i, r, g, b;
 
@@ -177,7 +174,11 @@ static void open_display(void)
 	/* bilevel colors */
 	XParseColor(display, colormap, background, &colors[0]);
 	XAllocColor(display, colormap, &colors[0]);
-	XParseColor(display, colormap, vector_graphic_hires_foreground, &colors[1]);
+	sprintf(rgb_str, "#%02X%02X%02X",
+		vector_graphic_hires_fg_color[0],
+		vector_graphic_hires_fg_color[1],
+		vector_graphic_hires_fg_color[2]);
+	XParseColor(display, colormap, rgb_str, &colors[1]);
 	XAllocColor(display, colormap, &colors[1]);
 
 	/* halftone shades */
