@@ -6,7 +6,7 @@
  * Copyright (C) 2015-2019 by Udo Munk
  * Copyright (C) 2018 David McNaughton
  * Copyright (C) 2025 by Thomas Eberhardt
- * Copyright (C) 2025 Ansgar Kueckes (realtime extensions)
+ * Copyright (C) 2025 Ansgar Kueckes
  *
  * Emulation of a Cromemco DAZZLER S100 board
  *
@@ -26,7 +26,7 @@
  * 19-JUL-2018 integrate webfrontend
  * 04-NOV-2019 remove fake DMA bus request
  * 04-JAN-2025 add SDL2 support
- * 06-JUN-2025 added support for interlaced video, line flag/busmaster and window resize
+ * 06-JUN-2025 added support for more accurate timing, interlaced video, odd-even-line flag and window resize
 */
 
 #include <stdio.h>
@@ -37,8 +37,8 @@
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-#include <string.h>
 #include <X11/extensions/Xrender.h>
+#include <string.h>
 #endif
 
 #include "sim.h"
@@ -71,7 +71,6 @@ static const char *TAG = "DAZZLER";
 
 /* parameters configurable in system.conf */
 bool dazzler_interlaced = false;	/* non-interlaced display by default */
-bool dazzler_line_sync = false;		/* no line sync by default */
 bool dazzler_discrete_scale = false;	/* no decsrete window scaling by default */
 
 /* SDL2/X11 stuff */
@@ -171,14 +170,6 @@ static char gray12[] =  "#CCCCCC";
 static char gray13[] =  "#DDDDDD";
 static char gray14[] =  "#EEEEEE";
 static char gray15[] =  "#FFFFFF";
-
-int errorHandler(Display *dpy, XErrorEvent *err)
-{
-    char buf[256];
-    XGetErrorText(dpy, err->error_code, buf, 256);
-    fprintf(stderr, "Error: %s\r\n", buf);
-    return 0;
-}
 #endif /* !WANT_SDL */
 
 /* DAZZLER stuff */
@@ -220,11 +211,9 @@ static void open_display(void)
 	uint64_t t_start;
 	
 	/* calibrate sleep timer */
-	if (dazzler_line_sync) {
-		t_start = T;
-		for (i=0; i<1000; i++) sleep_for_us(1);
-		ticks_per_usleep = (T - t_start) / 1000;
-	}
+	t_start = T;
+	for (i=0; i<1000; i++) sleep_for_us(1);
+	ticks_per_usleep = (T - t_start) / 1000;
 	row_data.frame_index = 0;
 	
 #ifdef WANT_SDL
@@ -240,7 +229,6 @@ static void open_display(void)
 	Atom wm_delete_window;
     	int first_event, first_error;
 	
-	XSetErrorHandler(errorHandler);
 	display = XOpenDisplay(NULL);
 	XLockDisplay(display);
 	screen = DefaultScreen(display);
@@ -249,19 +237,6 @@ static void open_display(void)
 	window = XCreateSimpleWindow(display, rootwindow, 0, 0,
 				     window_size, window_size, 1, 0, 0);
 	XStoreName(display, window, "Cromemco DAzzLER");
-	size_hints->flags = PSize | PMinSize | PAspect | PResizeInc;
-	size_hints->min_width = WSIZE;
-	size_hints->min_height = WSIZE;
-	size_hints->base_width = WSIZE;
-	size_hints->base_height = WSIZE;
-	size_hints->min_aspect.x = 1;
-	size_hints->min_aspect.y = 1;
-	size_hints->max_aspect.x = 1;
-	size_hints->max_aspect.y = 1;
-	size_hints->width_inc = 1;
-	size_hints->height_inc = 1;
-	XSetWMNormalHints(display, window, size_hints);
-	XFree(size_hints);
 
 	wm_focused = XInternAtom(display, "_NET_WM_STATE_FOCUSED", 0);
     	wm_maxhorz = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", 0);
@@ -363,6 +338,25 @@ static void open_display(void)
 		transform.matrix[2][2] = XDoubleToFixed(1);					
 		XRenderSetPictureTransform(display, canvas_pic, &transform);
 	}
+	
+	/* size hints */
+	size_hints->flags = PSize | PMinSize | PMaxSize | PAspect;
+	size_hints->min_width = WSIZE;
+	size_hints->min_height = WSIZE;
+	size_hints->base_width = WSIZE;
+	size_hints->base_height = WSIZE;
+	size_hints->max_width = WSIZE;
+	size_hints->max_height = WSIZE;
+	size_hints->min_aspect.x = 1;
+	size_hints->min_aspect.y = 1;
+	size_hints->max_aspect.x = 1;
+	size_hints->max_aspect.y = 1;
+
+	if (has_xrender_extension || dazzler_discrete_scale)
+		size_hints->flags = PSize | PMinSize | PAspect;
+
+	XSetWMNormalHints(display, window, size_hints);
+	XFree(size_hints);
 
 	XMapWindow(display, window);
 	XUnlockDisplay(display);
@@ -435,12 +429,10 @@ void cromemco_dazzler_off(void)
 
 #if 0
 	/* ouput debug data */
-	if (dazzler_line_sync) {
-		for (frame=0; frame<row_data.frame_index; frame++) {
-			for (row=0; row<64; row++) {
-				printf("frame=%d row=%d cycle=%d ticks=%d gap=%d\n",
-				frame, row, row_data.cycle[frame], row_data.ticks[frame][row], row_data.gap[frame][row]);
-			}
+	for (frame=0; frame<row_data.frame_index; frame++) {
+		for (row=0; row<64; row++) {
+			printf("frame=%d row=%d cycle=%d ticks=%d gap=%d\n",
+			frame, row, row_data.cycle[frame], row_data.ticks[frame][row], row_data.gap[frame][row]);
 		}
 	}
 #endif
@@ -544,8 +536,7 @@ static inline void fill_rect(int x, int y, int w, int h)
 	
 	For accurate emulation, the host actually should be put into hold mode
 	during the DMA fetch, which in the real hardware is slowing down
-	processing by roughly 15%. This, however, has not yet been implemented
-	yet in the emulation, so the host is always running at full speed.
+	processing by roughly 15%.
 	
 	Implementation
 
@@ -593,12 +584,11 @@ static inline void fill_rect(int x, int y, int w, int h)
 	The reference to "even lines/odd lines" is a bit misleading, since that
 	flag actually refers to the DMA cycles, which are matching display
 	lines only in the nibble mode, not in the x4 mode, and are especially
-	not referring scanlines. Normally the emulator draws a full frame as
-	fast as possible, sleeping for the rest of the vertical period for
-	being in sync with the vertical frequency. If an application requires
-	syncing to the DMA cycles (e.g. for tracking the line flag), you
-	can enable line sync by sttting the variable dazzler_line_sync in
-	the system.conf file to 1.
+	not referring scanlines.
+	
+	The original hardware puts the CPU into a hold state during DMA transfers,
+	which should be implemented by calling the emulation's bus request function,
+	which is also used here with every DMA cycle.
 	
 	The Dazzler hardware is always operating in interlaced mode, where the
 	display shows fields of even and odd scanlines alternating with a
@@ -606,12 +596,9 @@ static inline void fill_rect(int x, int y, int w, int h)
 	
 	Because X Windows actually can't fully keep up drawing interlaced
 	fields, this emulation by default runs in a flickerless	non-interlaced
-	mode, which flattens all scanlines into a single frame with 31 Hz
-	refresh. You can switch to the more accurate interlaced mode by setting
-	the dazzler_interlaced property in the system.conf file to 1.
-	
-	Most accurate timing therefore can be configured by setting both
-	dazzler_interaced and dazzler_line_sync in the sytem.conf file to 1.
+	mode, which flattens all scanlines into a single frame with 62 Hz
+	refresh. You can switch to the visually more accurate interlaced mode
+	by setting the dazzler_interlaced property in the system.conf file to 1.
 	
 	Neither Linux nor Windows are offering an accurate sleep function
 	for descheduling the current thread for a certain amount of time.
@@ -620,6 +607,20 @@ static inline void fill_rect(int x, int y, int w, int h)
 	sleep_for_us(1), which is the shortest possible latency, and
 	synchronizes with the state clock of the emulated CPU. Not perfect,
 	but seems to deliver the best possible results.
+
+	X11 out of the box won't support free scaling of window contents (canvas).
+	This normally is handled efficiently by the Xrender extension using the
+	capabilities of the display hardware, which is also used here. If this
+	extension is not supported by the X server, resizing the Dazzler window
+	by default is disabled.
+	
+	Free scaling can, however, lead to unwanted effects in that the pixels
+	have uneven sizes. This can best be avoided by limiting scaling to
+	full multiples of the original Dazzler display geometry, which can
+	be activated by setting dazzler_discrete_scale to 1 in the config
+	file. This also activates scaling without Xrender extension, which
+	is then done by adjusting the pixel size already when drawing the canvas,
+	so that no scaling is required any more during rendering.
 */
 static Tstates_t dazzler_busmaster(BYTE bus_ack)
 {
@@ -630,7 +631,7 @@ static Tstates_t dazzler_busmaster(BYTE bus_ack)
 	num_bytes = format & 0x20 ? 32 : 16;
 
 #if 0
-	/* read DMA memory into line buffer */
+	/* read DMA memory into line buffer (currently won't work with reliable timing) */
 	int bytepos, offset;
 	for (bytepos=0; bytepos<num_bytes; bytepos++) {
 		offset = bytepos % 16;
@@ -709,8 +710,7 @@ static void draw_field(int field)
 			}
 
 			/* simulate bus master activity */
-			if (dazzler_line_sync)
-				start_bus_request(BUS_DMA_CONTINUOUS, &dazzler_busmaster);
+			start_bus_request(BUS_DMA_CONTINUOUS, &dazzler_busmaster);
 		}
 
 		for (bytepos=0; bytepos<num_bytes; bytepos++) {
@@ -772,28 +772,27 @@ static void draw_field(int field)
 
 		/* post processing after last line */
 		if (current_line >= num_lines) {
-			if (dazzler_line_sync) {
-				/* collect some debug data */
-				if (row_data.frame_index < 10) {
-					row_data.ticks[row_data.frame_index][row_data.row_index] = T_end_of_row - T;
-				}
 
-				/* wait until end of row */
-				while ((T < (T_end_of_row - ticks_per_usleep)) && (cpu_state == ST_CONTIN_RUN))
-					sleep_for_us(1);
-				
-				/* collect some more debug data */
-				if (row_data.frame_index < 10) {
-					row_data.gap[row_data.frame_index][row_data.row_index] = T_end_of_row - T;
-					row_data.row_index++;
-					if (row_data.row_index == 64) {
-						row_data.row_index = 0;
-						row_data.frame_index++;
-					}
-				}				
-
-				T_end_of_row += dma_cycle;
+			/* collect some debug data */
+			if (row_data.frame_index < 10) {
+				row_data.ticks[row_data.frame_index][row_data.row_index] = T_end_of_row - T;
 			}
+
+			/* wait until end of row */
+			while ((T < (T_end_of_row - ticks_per_usleep)) && (cpu_state == ST_CONTIN_RUN)) sleep_for_us(1);
+			
+			/* collect some more debug data */
+			if (row_data.frame_index < 10) {
+				row_data.gap[row_data.frame_index][row_data.row_index] = T_end_of_row - T;
+				row_data.row_index++;
+				if (row_data.row_index == 64) {
+					row_data.row_index = 0;
+					row_data.frame_index++;
+				}
+			}				
+
+			T_end_of_row += dma_cycle;
+
 			addr += 16;		/* new start address */
 			current_line = 0;	/* reset scanline counter */
 			flags ^= 0x80;		/* toggle line flag */
@@ -843,8 +842,7 @@ static void ws_refresh(void)
 				cont = false;
 				val = dma_read(dma_addr + i);
 			}
-			if (cont)
-				break;
+			if (cont) break;
 			x = 0;
 #define LOOKAHEAD 6
 			/* look-ahead up to n bytes for next change */
@@ -938,7 +936,7 @@ static win_funcs_t dazzler_funcs = {
 #endif
 
 #ifndef WANT_SDL
-void process_event()
+static void process_event()
 {
 	XEvent event;
 	Atom actual_type, prop;
@@ -956,7 +954,7 @@ void process_event()
 			}
 			break;
 		case PropertyNotify:
-			/* check for window maximize/minimize/normalize property change */
+			/* grant WSLg some time to process */
 			sleep_for_ms(1);
 			if (!strcmp(XGetAtomName(display, event.xproperty.atom), "_NET_WM_STATE")) {
 	                    status = XGetWindowProperty(display, window, event.xproperty.atom, 0L, 1L, 0, 4,
@@ -998,6 +996,7 @@ static void *update_thread(void *arg)
 				process_event();
 				if (window_resized) {
 					XGetWindowAttributes(display, window, &wa);
+					/* make sure we have the correct aspect ratio even if the wm ignores the size hints */
 					window_size = wa.width < wa.height ? wa.width : wa.height;
 					if (dazzler_discrete_scale) {
 						pscale = window_size / WSIZE;
@@ -1011,7 +1010,6 @@ static void *update_thread(void *arg)
 						}
 					}
 					else if (has_xrender_extension) {
-						/* make sure we have a square window even if the wm ignores the size hints*/
 						XResizeWindow(display, window, window_size, window_size);
 						XTransform transform;
 						scale_factor = (double)canvas_size / (double)window_size;					

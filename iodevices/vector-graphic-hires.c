@@ -5,7 +5,7 @@
  *
  * Copyright (C) 2015-2019 by Udo Munk
  * Copyright (C) 2018 David McNaughton
- * Copyright (C) 2024 Ansgar Kueckes (Vector Graphic High Resoution Graphics board emulation)
+ * Copyright (C) 2024 Ansgar Kueckes
  *
  * Emulation of a Vector Graphic High Resoution Graphics board
  *
@@ -17,6 +17,7 @@
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/extensions/Xrender.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -58,8 +59,11 @@ int vector_graphic_hires_mode = DEFAULT_HIRES_MODE;
 int vector_graphic_hires_address = DEFAULT_HIRES_ADDRESS;
 uint8_t vector_graphic_hires_fg_color[3] = {0, 255, 0};
 
-static int w_width = 512;
-static int w_height = 480;
+static int window_width = 512;
+static int window_height = 480;
+static int canvas_width = 512;
+static int canvas_height = 480;
+static bool window_resized = false;
 
 #ifdef WANT_SDL
 static int hires_win_id = -1;
@@ -89,11 +93,17 @@ static uint8_t grays[16][3] = {
 };
 #else
 /* X11 stuff */
+static int has_xrender_extension = 0;
+static XRenderPictFormat *pict_format;
+static Picture canvas_pic;
+static Picture window_pic;
+static double scale_factor;
 static Display *display;
 static Window window;
 static int screen;
 static GC gc;
 static XWindowAttributes wa;
+static Atom wm_focused, wm_maxhorz, wm_maxvert, wm_hidden;	
 static Pixmap pixmap;
 static Colormap colormap;
 static XColor colors[2];
@@ -133,13 +143,14 @@ static void open_display(void)
 	window = SDL_CreateWindow("Vector Graphic HiRes",
 				  SDL_WINDOWPOS_UNDEFINED,
 				  SDL_WINDOWPOS_UNDEFINED,
-				  w_width, w_height, 0);
+				  window_width, window_height, 0);
 	renderer = SDL_CreateRenderer(window, -1, (SDL_RENDERER_ACCELERATED |
 						   SDL_RENDERER_PRESENTVSYNC));
 #else /* !WANT_SDL */
 	Window rootwindow;
 	XSizeHints *size_hints = XAllocSizeHints();
 	Atom wm_delete_window;
+    	int first_event, first_error;
 	char rgb_str[8];
 	int i, r, g, b;
 
@@ -153,23 +164,22 @@ static void open_display(void)
 	rootwindow = RootWindow(display, screen);
 	XGetWindowAttributes(display, rootwindow, &wa);
 	window = XCreateSimpleWindow(display, rootwindow, 0, 0,
-				     w_width, w_height, 1, 0, 0);
+				     window_width, window_height, 1, 0, 0);
 	XStoreName(display, window, "Vector Graphic HiRes");
-	size_hints->flags = PSize | PMinSize | PMaxSize;
-	size_hints->min_width = w_width;
-	size_hints->min_height = w_height;
-	size_hints->base_width = w_width;
-	size_hints->base_height = w_height;
-	size_hints->max_width = w_width;
-	size_hints->max_height = w_height;
-	XSetWMNormalHints(display, window, size_hints);
-	XFree(size_hints);
+
+	wm_focused = XInternAtom(display, "_NET_WM_STATE_FOCUSED", 0);
+    	wm_maxhorz = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", 0);
+    	wm_maxvert = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", 0);
+    	wm_hidden = XInternAtom(display, "_NET_WM_STATE_HIDDEN", 0);		
 	wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
 	XSetWMProtocols(display, window, &wm_delete_window, 1);
+
+	XSelectInput(display, window, StructureNotifyMask | PropertyChangeMask);
+
 	colormap = DefaultColormap(display, 0);
 	gc = XCreateGC(display, window, 0, NULL);
 	XSetFillStyle(display, gc, FillSolid);
-	pixmap = XCreatePixmap(display, rootwindow, w_width, w_height, wa.depth);
+	pixmap = XCreatePixmap(display, rootwindow, window_width, window_height, wa.depth);
 
 	/* bilevel colors */
 	XParseColor(display, colormap, background, &colors[0]);
@@ -190,6 +200,44 @@ static void open_display(void)
 		XParseColor(display, colormap, rgb_str, &grays[i]);
 		XAllocColor(display, colormap, &grays[i]);
 	}
+
+	/* XRenderExtension stuff */
+    	if (XRenderQueryExtension(display, &first_event, &first_error)) {
+		XTransform transform;
+		has_xrender_extension = 1;
+		pict_format = XRenderFindVisualFormat(display, DefaultVisual(display, screen));
+		canvas_pic = XRenderCreatePicture(display, pixmap, pict_format, 0, NULL);
+		window_pic = XRenderCreatePicture(display, window, pict_format, 0, NULL);
+		scale_factor = 1.0;					
+		transform.matrix[0][0] = XDoubleToFixed(scale_factor);
+		transform.matrix[0][1] = XDoubleToFixed(0);
+		transform.matrix[0][2] = XDoubleToFixed(0);
+		transform.matrix[1][0] = XDoubleToFixed(0);
+		transform.matrix[1][1] = XDoubleToFixed(scale_factor);
+		transform.matrix[1][2] = XDoubleToFixed(0);
+		transform.matrix[2][0] = XDoubleToFixed(0);
+		transform.matrix[2][1] = XDoubleToFixed(0);
+		transform.matrix[2][2] = XDoubleToFixed(1);					
+		XRenderSetPictureTransform(display, canvas_pic, &transform);
+	}
+
+	/* size hints */
+	size_hints->flags = PBaseSize | PMinSize | PMaxSize | PAspect;
+	size_hints->base_width = window_width;
+	size_hints->base_height = window_height;
+	size_hints->min_width = window_width;
+	size_hints->min_height = window_height;
+	size_hints->max_width = window_width;
+	size_hints->max_height = window_height;
+	size_hints->min_aspect.x = 16;
+	size_hints->min_aspect.y = 15;
+	size_hints->max_aspect.x = 16;
+	size_hints->max_aspect.y = 15;
+	
+	if (has_xrender_extension) size_hints->flags = PBaseSize | PMinSize | PAspect;
+
+	XSetWMNormalHints(display, window, size_hints);
+	XFree(size_hints);
 
 	XMapWindow(display, window);
 	XUnlockDisplay(display);
@@ -219,7 +267,17 @@ static void close_display(void)
 /* process SDL event */
 static void process_event(SDL_Event *event)
 {
-	UNUSED(event);
+	switch(event->type) {
+	case SDL_WINDOWEVENT:
+		if ((event->window.event == SDL_WINDOWEVENT_RESIZED) ||
+			(event->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) ||
+			(event->window.event == SDL_WINDOWEVENT_MAXIMIZED) ||
+			(event->window.event == SDL_WINDOWEVENT_RESTORED)) {
+			window_resized = true;
+		}
+		break;
+	default:;
+	}
 }
 
 static inline void set_fg_color(int i)
@@ -444,6 +502,17 @@ static void update_display(bool tick)
 
 	t = get_clock_us();
 
+	/* handling window resize event */
+	if (window_resized) {
+		window_resized = false;
+		
+		/* smooth scaling */
+		SDL_GetWindowSize(window, &window_width, &window_height);
+		window_width = (window_height * 16) / 15;
+		SDL_SetWindowSize(window, window_width, window_height);
+	       	SDL_RenderSetScale(renderer, (double)window_width / canvas_width, (double)window_height / canvas_height);
+	}
+
 	/* draw one frame dependent on graphics format */
 	set_fg_color(0);
 	SDL_RenderClear(renderer);
@@ -469,6 +538,47 @@ static win_funcs_t hires_funcs = {
 };
 #endif /* WANT SDL */
 
+#ifndef WANT_SDL
+/* process X11 events */
+static void process_event()
+{
+	XEvent event;
+	Atom actual_type, prop;
+	int actual_format, status;
+	unsigned long nitems, bytes_after;
+	unsigned char *dp;
+
+	while (XCheckWindowEvent(display, window, StructureNotifyMask | PropertyChangeMask, &event)) {
+		switch(event.type) {
+		case ConfigureNotify:
+			/* check for window resize event */
+			XConfigureEvent xce = event.xconfigure;
+			if ((xce.width != window_width) || (xce.height != window_height)){
+				window_resized = true;
+			}
+			break;
+		case PropertyNotify:
+			/* check for window maximize/minimize/normalize property change */
+			sleep_for_ms(1);
+			if (!strcmp(XGetAtomName(display, event.xproperty.atom), "_NET_WM_STATE")) {
+	                    status = XGetWindowProperty(display, window, event.xproperty.atom, 0L, 1L, 0, 4,
+	                    				&actual_type, &actual_format, &nitems, &bytes_after, &dp);
+	                    if ((status == Success) && (actual_type == 4) && dp && (actual_format == 32) && nitems) {
+	                        for (unsigned int i = 0; i < nitems; i++) {
+	                            prop = (((Atom*)dp)[i]);
+	                            if ((prop == wm_focused) || (prop == wm_maxhorz) || (prop == wm_maxvert)) {
+					window_resized = true;
+				    }
+				}
+			    }
+		        }
+		        break;
+		default:;
+		}
+	}
+}
+#endif
+
 #if !defined(WANT_SDL) || defined(HAS_NETSERVER)
 /* thread for updating the X11 display or web server */
 static void *update_thread(void *arg)
@@ -487,12 +597,47 @@ static void *update_thread(void *arg)
 			if (!n_flag) {
 #endif
 #ifndef WANT_SDL
+				process_event();
+				if (window_resized) {
+					XGetWindowAttributes(display, window, &wa);
+					window_width = wa.width;
+					window_height = wa.height;
+					/* make sure we have a the correct aspect ratio even if the wm ignores the size hints */
+					window_width = (window_height * 16) / 15;
+					if (has_xrender_extension) {
+						XResizeWindow(display, window, window_width, window_height);
+						XTransform transform;
+						double scale_factor_x = (double)canvas_width / (double)window_width;					
+						double scale_factor_y = (double)canvas_height / (double)window_height;					
+						transform.matrix[0][0] = XDoubleToFixed(scale_factor_x);
+						transform.matrix[0][1] = XDoubleToFixed(0);
+						transform.matrix[0][2] = XDoubleToFixed(0);
+						transform.matrix[1][0] = XDoubleToFixed(0);
+						transform.matrix[1][1] = XDoubleToFixed(scale_factor_y);
+						transform.matrix[1][2] = XDoubleToFixed(0);
+						transform.matrix[2][0] = XDoubleToFixed(0);
+						transform.matrix[2][1] = XDoubleToFixed(0);
+						transform.matrix[2][2] = XDoubleToFixed(1);					
+						XRenderSetPictureTransform(display, canvas_pic, &transform);
+					} else {
+						/* prohibit resize */
+						window_width = canvas_width;
+						window_height = canvas_height;
+						XResizeWindow(display, window, window_width, window_height);
+					}
+					window_resized = false;
+				}
 				XLockDisplay(display);
 				set_fg_color(0);
-				fill_rect(0, 0, w_width, w_height);
-				draw_frame();
-				XCopyArea(display, pixmap, window, gc, 0, 0,
-					  w_width, w_height, 0, 0);
+				fill_rect(0, 0, window_width, window_height);
+	        		draw_frame();
+				if (has_xrender_extension) {
+				        XRenderComposite(display, PictOpSrc, canvas_pic, 0, window_pic,
+				                         0, 0, 0, 0, 0, 0, window_width, window_height);
+				}
+				else {
+					XCopyArea(display, pixmap, window, gc, 0, 0, window_width, window_height, 0, 0);
+				}
 				XSync(display, True);
 				XUnlockDisplay(display);
 #endif

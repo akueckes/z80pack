@@ -291,18 +291,6 @@ void config(void)
 					LOGW(TAG, "invalid value for %s: %s", t1, t2);
 					break;
 				}
-			} else if (!strcmp(t1, "dazzler_line_sync")) {
-				switch (*t2) {
-				case '0':
-					dazzler_line_sync = false;
-					break;
-				case '1':
-					dazzler_line_sync = true;
-					break;
-				default:
-					LOGW(TAG, "invalid value for %s: %s", t1, t2);
-					break;
-				}
 			} else if (!strcmp(t1, "dazzler_discrete_scale")) {
 				switch (*t2) {
 				case '0':

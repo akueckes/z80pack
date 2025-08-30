@@ -485,8 +485,6 @@ void ayumi_remove_dc(struct ayumi* ay) {
 */
 void psg_out(struct ayumi* ay, int register_select, BYTE data)
 {
-//    printf("\nreg %d data %02X\n\r", register_select, data);
-        
     switch(register_select) {
         case 0: /* channel A fine tune */
                 ay->channels[0].tone_period &= ~0xff;
@@ -614,8 +612,7 @@ void sdl_audio_callback(void *userdata, uint8_t *stream, int len)
 
 static SDL_AudioDeviceID sdl_audio_init(void)
 {
-	SDL_AudioSpec desired, obtained;
-	SDL_AudioDeviceID device_id;
+	SDL_AudioSpec desired;
 
 	/* prepare audio properties for streaming */
 	desired.freq = noisemaker_sample_rate;
@@ -627,7 +624,7 @@ static SDL_AudioDeviceID sdl_audio_init(void)
 	desired.userdata = &sound_board;
 
 	/* start streaming */
-	device_id = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(0, 0), 0, &desired, &obtained, 0);
+	device_id = SDL_OpenAudioDevice(0, 0, &desired, 0, 0);
 	if (device_id == 0) {
 		fprintf(stderr, "SDL: Failed to open audio device: %s\n", SDL_GetError());
 	}

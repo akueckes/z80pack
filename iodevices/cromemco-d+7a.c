@@ -1,4 +1,4 @@
-/**
+/*
  * cromemco-d+7a.c
  *
  * Emulation of the Cromemco D+7A I/O
@@ -8,7 +8,7 @@
  *
  * History:
  * 14-JAN-2020	1.0	Initial Release
- * 06-JUN-2025		Functional implementation based on SDL_Audio and PortAudio
+ * 06-JUN-2025		Audio and joystick support based on SDL2 and (optionally) PortAudio
  */
 
 #include <stdlib.h>
@@ -110,6 +110,10 @@ static int timeouts = 0;
 
 static SDL_AudioDeviceID device_id;
 
+/*
+   This routine will be called by the SDL2 audio framework each time new data
+   for playback on an audio device is requested.
+*/
 static void sdl_audio_callback(void *userdata, uint8_t *stream, int len)
 {
     RingBuffer *ring_buffer = (RingBuffer*)userdata;
@@ -118,9 +122,6 @@ static void sdl_audio_callback(void *userdata, uint8_t *stream, int len)
     /* return if ring buffer is in use or no data is available */
     if (ring_buffer->lock || (len == 0)) return;
     	
-    /* lock ring buffer */
-    ring_buffer->lock = 1;
-
     max = 0;
     for (c=0; c<NUM_CHANNELS; c++) {
     	count = ring_buffer->channel[c].count;
@@ -158,15 +159,11 @@ static void sdl_audio_callback(void *userdata, uint8_t *stream, int len)
 		}
 	}
     }
-
-    /* unlock ring buffer */
-    ring_buffer->lock = 0;
 }
 
 static SDL_AudioDeviceID sdl_audio_init(void)
 {
-	SDL_AudioSpec desired, obtained;
-	SDL_AudioDeviceID device_id;
+	SDL_AudioSpec desired;
 
 	/* prepare audio properties for streaming */
 	desired.freq = d7a_sample_rate;
@@ -177,8 +174,8 @@ static SDL_AudioDeviceID sdl_audio_init(void)
 	desired.callback = sdl_audio_callback;
 	desired.userdata = &ring_buffer;
 
-	/* start streaming */
-	device_id = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(0, 0), 0, &desired, &obtained, 0);
+	/* start streaming (actually, Mix_SetPostMix() should be used for not confusing applications using the SDL2 mixer) */
+	device_id = SDL_OpenAudioDevice(0, 0, &desired, 0, 0);
 	if (device_id == 0) {
 		fprintf(stderr, "SDL: Failed to open audio device: %s\n", SDL_GetError());
 	}
@@ -186,7 +183,7 @@ static SDL_AudioDeviceID sdl_audio_init(void)
 		/* start audio device */
 		SDL_PauseAudioDevice(device_id, 0);
 	}
-	
+
 	return device_id;
 }
 
@@ -202,10 +199,11 @@ static void sdl_audio_off(SDL_AudioDeviceID device_id)
 
 static PaStream *stream;
 
-/* This routine will be called by the PortAudio engine when audio is needed.
-** It may called at interrupt level on some machines so don't do anything
-** that could mess up the system like calling malloc() or free().
-*/
+/*
+   This routine will be called by the PortAudio engine when audio is needed.
+   It may called at interrupt level on some machines so don't do anything
+   that could mess up the system like calling malloc() or free().
+ */
 static int paCallback( const void *inputBuffer, void *outputBuffer,
                            unsigned long framesPerBuffer,
                            const PaStreamCallbackTimeInfo* timeInfo,
@@ -417,6 +415,10 @@ void cromemco_d7a_record(int port, char data)
     }
     last_time[c] = current_time;
     
+#ifdef WANT_SDL
+    SDL_LockAudioDevice(device_id);
+    UNUSED(timeout);
+#else
     /* wait for being unlocked */
     timeout = 1000000;
     while(ring_buffer.lock && !timeout) timeout--;
@@ -425,6 +427,8 @@ void cromemco_d7a_record(int port, char data)
 	timeouts++;
     	return;
     }
+    ring_buffer.lock = 1;
+#endif
 
     if (ring_buffer.channel[c].count == 0) underflows++;
 
@@ -490,7 +494,14 @@ void cromemco_d7a_record(int port, char data)
     	}
     }
     ring_buffer.channel[c].count += count;
-    	
+    
+#ifdef WANT_SDL
+    SDL_UnlockAudioDevice(device_id);
+#else
+    ring_buffer.lock = 0;
+#endif
+    
+
     if (port == 1) {
 	last_data[0] = data;
     }
@@ -540,20 +551,20 @@ void cromemco_d7a_init(void)
 #ifdef WANT_SDL
     if (sdl_num_joysticks > 0) {
     	if (sdl_num_joysticks == 1) {
-    	    LOG(TAG, "D+7A: 1 joystick connected\r\n");
+    	    LOG(TAG, "D+7A: 1 joystick connected\n");
     	}
     	else {
-    	    LOG(TAG, "D+7A: %d joysticks connected\r\n", sdl_num_joysticks);
+    	    LOG(TAG, "D+7A: %d joysticks connected\n", sdl_num_joysticks);
     	}
     }
     else {
-    	    LOG(TAG, "D+7A: No joystick connected\r\n");
+    	    LOG(TAG, "D+7A: No joystick connected\n");
     }
     if ((device_id = sdl_audio_init())) {
-    	    LOG(TAG, "D+7A: SDL audio initialized & ready to use\r\n");
+    	    LOG(TAG, "D+7A: SDL audio initialized & ready to use\n");
     }
     else {
-    	    LOG(TAG, "D+7A: Could not initialize SDL audio\r\n");
+    	    LOG(TAG, "D+7A: Could not initialize SDL audio\n");
     	    return;
     }
 #endif
@@ -561,10 +572,10 @@ void cromemco_d7a_init(void)
 #ifdef WANT_PORTAUDIO
     /* initialize PortAudio */
     if (portaudio_init() >= 0) {
-    	    LOG(TAG, "D+7A: PortAudio initialized & ready to use\r\n");
+    	    LOG(TAG, "D+7A: PortAudio initialized & ready to use\n");
     }
     else {
-    	    LOG(TAG, "D+7A: Could not initialize PortAudio\r\n");
+    	    LOG(TAG, "D+7A: Could not initialize PortAudio\n");
     	    return;
     };
 #endif
@@ -647,16 +658,9 @@ void cromemco_d7a_off(void)
 		free(d7a_soundfile);
 	}
 	
-//		if ((i > 1) && (i < 1000)) {
-//		    printf("index=%d %d %d %d %d %lu %lu %d\n\r", i, wave_buffer[i].sample_1, wave_buffer[i].sample_2,
-//		        wave_buffer[i].count_1, wave_buffer[i].count_2, wave_buffer[i].tick_1 - wave_buffer[i-1].tick_1, wave_buffer[i].tick_2 - wave_buffer[i-1].tick_2, wave_buffer[i].status);
-//		}
-
 	if (d7a_stats) {
     	    LOG(TAG, "D7A stats: underflows: %d overflows: %d dropouts: %d timeouts: %d\n",
 		underflows, overflows, dropouts, timeouts);
-//	printf("D7A stats: underflows: %d overflows: %d dropouts: %d timeouts: %d\n",
-//		underflows, overflows, dropouts, timeouts);
 	}
 	
 	if (wave_buffer) free(wave_buffer);
@@ -668,7 +672,6 @@ void cromemco_d7a_off(void)
 #ifdef WANT_PORTAUDIO
 	portaudio_off();
 #endif
-
 }
 
 static void cromemco_d7a_out(BYTE port, BYTE data)

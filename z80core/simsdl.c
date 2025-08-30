@@ -61,6 +61,7 @@ int main(int argc, char *argv[])
 	int i, status;
 	args_t args = {argc, argv};
 
+	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0) {
 		fprintf(stderr, "Can't initialize SDL: %s\n", SDL_GetError());
