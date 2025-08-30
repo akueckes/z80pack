@@ -143,7 +143,7 @@ static void open_display(void)
 	window = SDL_CreateWindow("Vector Graphic HiRes",
 				  SDL_WINDOWPOS_UNDEFINED,
 				  SDL_WINDOWPOS_UNDEFINED,
-				  window_width, window_height, 0);
+				  window_width, window_height, SDL_WINDOW_RESIZABLE);
 	renderer = SDL_CreateRenderer(window, -1, (SDL_RENDERER_ACCELERATED |
 						   SDL_RENDERER_PRESENTVSYNC));
 #else /* !WANT_SDL */
