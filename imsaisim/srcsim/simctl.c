@@ -87,8 +87,8 @@ static void power_clicked(int state, int val);
 static void quit_callback(void);
 
 #ifdef WANT_SDL
-static int fp_win_id;	/* frontpanel window id */
-static win_funcs_t fp_win_funcs = {
+static int fp_client_id;	/* frontpanel window id */
+static client_funcs_t fp_client_funcs = {
 	fp_openWindow,
 	fp_quit,
 	fp_procEvent,
@@ -124,7 +124,7 @@ void mon(void)
 			exit(EXIT_FAILURE);
 		}
 #ifdef WANT_SDL
-		fp_win_id = simsdl_create(&fp_win_funcs);
+		fp_client_id = simsdl_create(&fp_client_funcs);
 #endif
 
 		fp_addQuitCallback(quit_callback);
@@ -261,7 +261,7 @@ void mon(void)
 
 		/* stop frontpanel */
 #ifdef WANT_SDL
-		simsdl_destroy(fp_win_id);
+		simsdl_destroy(fp_client_id);
 #else
 		fp_quit();
 #endif

@@ -79,9 +79,9 @@ int  ns_port = NS_DEF_PORT;	/* default port to run web server on */
 void config(void)
 {
 	FILE *fp;
-	char buf[BUFSIZE];
+	char buf[BUFSIZE], tmp[BUFSIZE];
 	char *s, *t1, *t2, *t3, *t4;
-	int v1, v2, v3;
+	int v1, v2, v3, i;
 	char fn[MAX_LFN - 1];
 
 	int num_segs = 0;
@@ -96,7 +96,8 @@ void config(void)
 
 	if ((fp = fopen(fn, "r")) != NULL) {
 		while (fgets(buf, BUFSIZE, fp) != NULL) {
-			s = buf;
+			strncpy(tmp, buf, BUFSIZE);
+			s = tmp;
 			if ((*s == '\n') || (*s == '\r') || (*s == '#'))
 				continue;
 			if ((t1 = strtok(s, " \t")) == NULL) {
@@ -291,6 +292,18 @@ void config(void)
 					LOGW(TAG, "invalid value for %s: %s", t1, t2);
 					break;
 				}
+			} else if (!strcmp(t1, "dazzler_line_sync")) {
+				switch (*t2) {
+				case '0':
+					dazzler_line_sync = false;
+					break;
+				case '1':
+					dazzler_line_sync = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
 			} else if (!strcmp(t1, "dazzler_discrete_scale")) {
 				switch (*t2) {
 				case '0':
@@ -329,6 +342,58 @@ void config(void)
 					LOGW(TAG, "invalid value for %s: %s", t1, t2);
 					break;
 				}
+			} else if (!strcmp(t1, "d7a_axis_map")) {
+				strncpy(tmp, buf, BUFSIZE);
+				s = tmp;
+				strtok(s, " \t,");
+				d7a_axis_map = malloc(65 * sizeof(int));
+				if (!d7a_axis_map) {
+					LOGW(TAG, "out of memory\n");
+					continue;
+				}
+				for (i=0; i<64; i++) {
+					t2 = strtok(NULL, " \t,");
+					if (t2 == NULL) break;
+					d7a_axis_map[i] = strtol(t2, NULL, 0);
+					if ((d7a_axis_map[i] < 0) || (d7a_axis_map[i] > 255)) {
+						LOGW(TAG, "invalid value for %s: %s", t1, t2);
+						break;
+					}
+				}
+				if (i>0) {
+					d7a_axis_map[i] = -1;
+				}
+				else {
+					free(d7a_axis_map);
+					d7a_axis_map = NULL;
+				}
+				continue;
+			} else if (!strcmp(t1, "d7a_button_map")) {
+				strncpy(tmp, buf, BUFSIZE);
+				s = tmp;
+				strtok(s, " \t,");
+				d7a_button_map = malloc(513 * sizeof(int));
+				if (!d7a_button_map) {
+					LOGW(TAG, "out of memory\n");
+					continue;
+				}
+				for (i=0; i<512; i++) {
+					t2 = strtok(NULL, " \t,");
+					if (t2 == NULL) break;
+					d7a_button_map[i] = strtol(t2, NULL, 0);
+					if ((d7a_button_map[i] < 0) || (d7a_button_map[i] > 65535)) {
+						LOGW(TAG, "invalid value for %s: %s", t1, t2);
+						break;
+					}
+				}
+				if (i>0) {
+					d7a_button_map[i] = -1;
+				}
+				else {
+					free(d7a_button_map);
+					d7a_button_map = NULL;
+				}
+				continue;
 #endif
 #ifdef HAS_NOISEMAKER
 			} else if (!strcmp(t1, "noisemaker_sample_rate")) {

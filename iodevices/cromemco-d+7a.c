@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "sys/time.h"
+#include <sys/time.h>
 
 #include "sim.h"
 #include "simdefs.h"
@@ -23,6 +23,13 @@
 #ifdef WANT_SDL
 #include <SDL.h>
 #include "simsdl.h"
+#else
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/ioctl.h>
+#include <linux/input.h>
+#include <linux/joystick.h>
 #endif
 
 #ifdef WANT_PORTAUDIO
@@ -36,7 +43,7 @@
 
 // #define LOG_LOCAL_LEVEL LOG_DEBUG
 #include "log.h"
-static const char *TAG = "D+7AIO";
+static const char *TAG = "D+7A";
 
 #define PORT_COUNT  8
 
@@ -58,6 +65,7 @@ static BYTE outPort[PORT_COUNT];
     stopped.
 */
 
+#define MAX_JOYSTICKS		2		/* max number of joystick devices */
 #define NUM_CHANNELS 		2		/* number of channels, 2 for stereo */
 #define DEFAULT_SAMPLE_RATE	22050		/* default SDL audio sample rate in Hz */
 #define DEFAULT_BUFFER_SIZE	64		/* default audio buffer size in samples per channel, defines audio delay */
@@ -72,6 +80,8 @@ long d7a_recording_limit = DEFAULT_RECORDING_LIMIT;
 long d7a_buffer_size = DEFAULT_BUFFER_SIZE;
 char *d7a_soundfile = NULL;
 bool d7a_stats = false;
+int *d7a_axis_map = NULL;
+int *d7a_button_map = NULL;
 
 typedef struct {
 	char sample[NUM_CHANNELS];		/* actual sample for each channel */
@@ -106,8 +116,20 @@ static int overflows = 0;
 static int dropouts = 0;
 static int timeouts = 0;
 
+static int d7a_num_joysticks = 0;
+static char d7a_joystick_0_x_axis;
+static char d7a_joystick_0_y_axis;
+static char d7a_joystick_1_x_axis;
+static char d7a_joystick_1_y_axis;
+static BYTE d7a_joystick_buttons;
+
+#ifndef WANT_SDL
+static int d7a_joystick_fd[MAX_JOYSTICKS];
+#endif
+
 #ifdef WANT_SDL
 
+static int d7a_client_id = -1;
 static SDL_AudioDeviceID device_id;
 
 /*
@@ -160,6 +182,78 @@ static void sdl_audio_callback(void *userdata, uint8_t *stream, int len)
 	}
     }
 }
+
+/* SDL2 joystick event handler */
+static void sdl_process_event(SDL_Event *event)
+{
+	switch(event->type) {
+		case SDL_JOYAXISMOTION:
+			switch(event->jdevice.which) {
+			case 0:
+				switch(event->jaxis.axis) {
+				case 0:
+					d7a_joystick_0_x_axis = event->jaxis.value / 256;
+					break;
+				case 1:
+					d7a_joystick_0_y_axis = -event->jaxis.value / 256;
+					break;
+				default:;
+				}
+				break;
+			case 1:
+				switch(event->jaxis.axis) {
+				case 0:
+					d7a_joystick_1_x_axis = event->jaxis.value / 256;
+					break;
+				case 1:
+					d7a_joystick_1_y_axis = -event->jaxis.value / 256;
+					break;
+				default:;
+				}
+				break;
+			default:;
+			}
+			break;
+		case SDL_JOYHATMOTION:
+			break;
+		case SDL_JOYBUTTONDOWN:
+			switch(event->jdevice.which) {
+			case 0:
+				d7a_joystick_buttons &= ~(event->jbutton.button);
+				break;
+			case 1:
+				d7a_joystick_buttons &= ~(event->jbutton.button << 4);
+				break;
+			default:;
+			}	
+			break;
+		case SDL_JOYBUTTONUP:
+			switch(event->jdevice.which) {
+			case 0:
+				d7a_joystick_buttons |= event->jbutton.button;
+				break;
+			case 1:
+				d7a_joystick_buttons |= event->jbutton.button << 4;
+				break;
+			default:;
+			}	
+			break;
+		case SDL_JOYDEVICEADDED:
+			// TODO
+			break;
+		case SDL_JOYDEVICEREMOVED:
+			// TODO
+			break;
+		default:;
+	}
+}
+
+static client_funcs_t d7a_funcs = {
+	NULL,
+	NULL,
+	sdl_process_event,
+	NULL
+};
 
 static SDL_AudioDeviceID sdl_audio_init(void)
 {
@@ -547,15 +641,23 @@ void cromemco_d7a_init(void)
 		ring_buffer.channel[c].count = 0;
 		memset(ring_buffer.channel[c].sample, 0, RING_BUFFER_SIZE);
 	}
+	
+	d7a_joystick_buttons = 0xff;
 
 #ifdef WANT_SDL
-    if (sdl_num_joysticks > 0) {
-    	if (sdl_num_joysticks == 1) {
-    	    LOG(TAG, "D+7A: 1 joystick connected\n");
-    	}
-    	else {
-    	    LOG(TAG, "D+7A: %d joysticks connected\n", sdl_num_joysticks);
-    	}
+    d7a_client_id = simsdl_create(&d7a_funcs);
+
+    /* check for joysticks */
+    d7a_num_joysticks = SDL_NumJoysticks();
+    for (int i=0; i<d7a_num_joysticks; i++) {
+	if (SDL_JoystickOpen(i) == NULL)
+    		fprintf(stderr, "SDL: error reading joystick %d\n", i);
+    }
+
+    if (d7a_num_joysticks > 0) {
+    	if (d7a_num_joysticks == 1) {
+		LOG(TAG, "D+7A: %d joystick(s) connected\n", d7a_num_joysticks);
+	}
     }
     else {
     	    LOG(TAG, "D+7A: No joystick connected\n");
@@ -567,6 +669,52 @@ void cromemco_d7a_init(void)
     	    LOG(TAG, "D+7A: Could not initialize SDL audio\n");
     	    return;
     }
+#else	/* !WANT_SDL */
+    int i, j, fd;
+    char dev_path[] = "/dev/input/js0";
+    char buf[256] = "Unknown controller";
+    uint8_t num_axis, num_buttons;
+    uint8_t axis_map[ABS_CNT];
+    uint16_t button_map[KEY_MAX - BTN_MISC + 1];
+        
+    /* scan /dev/input/js* for joysticks */
+    d7a_num_joysticks = 0;
+    for (i=0; i<MAX_JOYSTICKS; i++) {
+    	dev_path[13] = i + 48;
+	fd = open(dev_path, O_RDONLY | O_NONBLOCK);
+	if (fd < 0) continue;
+	ioctl(fd, JSIOCGNAME(sizeof(buf)), buf);
+	ioctl(fd, JSIOCGAXES, &num_axis);
+	ioctl(fd, JSIOCGBUTTONS, &num_buttons);
+	LOG(TAG, "D+7A: Joystick found \"%s\" (%d axis, %d buttons)\n", buf, num_axis, num_buttons);
+
+	/* axis & button mappings */
+	if (d7a_axis_map) {
+		for (i=0; d7a_axis_map[i]>=0; i++)
+			axis_map[i] = d7a_axis_map[i];
+		ioctl(fd, JSIOCSAXMAP, axis_map);
+	}
+	if (d7a_button_map) {
+		for (i=0; d7a_button_map[i]>=0; i++)
+			button_map[i] = d7a_button_map[i];
+		ioctl(fd, JSIOCSBTNMAP, button_map);
+	}
+	if (d7a_stats) {
+		ioctl(fd, JSIOCGAXMAP, axis_map);
+		LOG(TAG, "D+7A: Axis mapping: ");
+		for (j=0; j<num_axis; j++)
+			LOG(TAG, "%d,", axis_map[j]);
+		LOG(TAG, "\b \b\n");
+		ioctl(fd, JSIOCGBTNMAP, button_map);
+		LOG(TAG, "D+7A: Button mapping: ");
+		for (j=0; j<num_buttons; j++)
+			LOG(TAG, "%d,", button_map[j]);
+		LOG(TAG, "\b \b\n");
+	}
+
+	d7a_joystick_fd[d7a_num_joysticks++] = fd;
+    }
+    LOG(TAG, "D+7A: %d joystick(s) found\n", d7a_num_joysticks);
 #endif
 
 #ifdef WANT_PORTAUDIO
@@ -664,9 +812,14 @@ void cromemco_d7a_off(void)
 	}
 	
 	if (wave_buffer) free(wave_buffer);
+	if (d7a_axis_map) free(d7a_axis_map);
+	if (d7a_button_map) free(d7a_button_map);
 
 #ifdef WANT_SDL
 	sdl_audio_off(device_id);
+#else
+	for (i=0; i<d7a_num_joysticks; i++)
+		if (d7a_joystick_fd[i] >= 0) close(d7a_joystick_fd[i]);
 #endif
 
 #ifdef WANT_PORTAUDIO
@@ -705,24 +858,64 @@ void cromemco_d7a_A7_out(BYTE data) { cromemco_d7a_out(7, data); }
 
 static BYTE cromemco_d7a_in(BYTE port)
 {
-#ifdef WANT_SDL
 #ifdef HAS_NETSERVER
 	if (n_flag)
 		return inPort[port];
 	else
 #endif
-		/* encode SDL input for D+A7 */
+	{
+#ifndef WANT_SDL
+		/* query event device */
+		struct js_event event;
+		int i, count;
+		bool quit = false;
+
+		if (d7a_num_joysticks > 0) {
+			while (!quit) {
+				for (i=0; i<d7a_num_joysticks; i++) {
+					count = read(d7a_joystick_fd[i], &event, sizeof(event));
+					if (count < 0) {
+				            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				                // No data available
+				                quit = true;
+				                break;
+				            } else {
+				                // Other read error
+				                fprintf(stderr, "D+7A: Read error: %s\r\n", strerror(errno));
+				                quit = true;
+				                break;
+				            }
+				        }
+					if (count == sizeof(event)) {
+						switch(event.type) {
+				                case JS_EVENT_BUTTON:
+				                    if (event.value) d7a_joystick_buttons &= ~((1 << event.number) << (i * 4));
+				                    else d7a_joystick_buttons |= (1 << event.number) << (i * 4);
+				                    break;
+				                case JS_EVENT_AXIS:
+				                    if ((i == 0) && (event.number == ABS_X)) d7a_joystick_0_x_axis = event.value / 256;
+				                    else if ((i == 0) && (event.number == ABS_Y)) d7a_joystick_0_y_axis = -event.value / 256;
+				                    else if ((i == 1) && (event.number == ABS_X)) d7a_joystick_1_x_axis = event.value / 256;
+				                    else if ((i == 1) && (event.number == ABS_Y)) d7a_joystick_1_y_axis = -event.value / 256;
+				                    break;
+				                case JS_EVENT_INIT:
+				                    break;
+				                default:;
+				                }
+				        }
+				}
+			}
+		}
+#endif
 		switch(port) {
-			case 0: return ~(sdl_joystick_0_buttons | (sdl_joystick_1_buttons << 4));
-			case 1: return (sdl_joystick_0_x_axis / 256);
-			case 2: return (-sdl_joystick_0_y_axis / 256);
-			case 3: return (sdl_joystick_1_x_axis / 256);
-			case 4: return (-sdl_joystick_1_y_axis / 256);
+			case 0: return d7a_joystick_buttons;
+			case 1: return d7a_joystick_0_x_axis;
+			case 2: return d7a_joystick_0_y_axis;
+			case 3: return d7a_joystick_1_x_axis;
+			case 4: return d7a_joystick_1_y_axis;
 			default: return inPort[port];
 		}
-#else
-	return inPort[port];	
-#endif	/* WANT_SDL */
+	}
 }
 
 BYTE cromemco_d7a_D_in (void) { return cromemco_d7a_in(0); };

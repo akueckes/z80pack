@@ -36,6 +36,7 @@
 #include "simdefs.h"
 
 extern bool dazzler_interlaced;
+extern bool dazzler_line_sync;
 extern bool dazzler_discrete_scale;
 
 void cromemco_dazzler_off(void);

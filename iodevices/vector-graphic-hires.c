@@ -13,16 +13,17 @@
  * 11-OCT-2024 first version
  */
  
-#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <pthread.h>
+
+#ifndef WANT_SDL
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/extensions/Xrender.h>
-#include <pthread.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <signal.h>
-#include <string.h>
+#endif
 
 #include "sim.h"
 
@@ -40,6 +41,7 @@
 #ifdef HAS_NETSERVER
 #include "netsrv.h"
 #endif
+
 #include "vector-graphic-hires.h"
 
 /* #define LOG_LOCAL_LEVEL LOG_DEBUG */
@@ -51,7 +53,7 @@ enum VideoMode {
 	HALFTONE = 1
 };
 
-#define DEFAULT_HIRES_MODE	BILEVEL		/* default video mode BILEVEL/HALFTONE */
+#define DEFAULT_HIRES_MODE	HALFTONE	/* default video mode BILEVEL/HALFTONE */
 #define DEFAULT_HIRES_ADDRESS	0xe000		/* default video memory address */
 char default_hires_foreground[] = "00ff00";	/* default foreground color */
 
@@ -59,16 +61,19 @@ int vector_graphic_hires_mode = DEFAULT_HIRES_MODE;
 int vector_graphic_hires_address = DEFAULT_HIRES_ADDRESS;
 uint8_t vector_graphic_hires_fg_color[3] = {0, 255, 0};
 
+static int frames;
 static int window_width = 512;
 static int window_height = 480;
 static int canvas_width = 512;
 static int canvas_height = 480;
 static bool window_resized = false;
+static uint64_t start_time;
 
 #ifdef WANT_SDL
-static int hires_win_id = -1;
+static int hires_client_id = -1;
 static SDL_Window *window;
 static SDL_Renderer *renderer;
+static SDL_Texture *canvas;
 static uint8_t colors[2][3] = {
 	{ 0x00, 0x00, 0x00 },
 	{ 0xFF, 0xFF, 0xFF }
@@ -93,28 +98,35 @@ static uint8_t grays[16][3] = {
 };
 #else
 /* X11 stuff */
-static int has_xrender_extension = 0;
+static uint8_t *canvas = NULL;
+static bool has_xrender_extension = false;
 static XRenderPictFormat *pict_format;
+static XTransform transform;
+static XImage *ximage;
 static Picture canvas_pic;
 static Picture window_pic;
-static double scale_factor;
 static Display *display;
 static Window window;
 static int screen;
 static GC gc;
+static XVisualInfo vinfo;
 static XWindowAttributes wa;
 static Atom wm_focused, wm_maxhorz, wm_maxvert, wm_hidden;	
 static Pixmap pixmap;
 static Colormap colormap;
 static XColor colors[2];
 static XColor grays[16];
+static XColor *fg;
 static char background[] =  "#000000";
 #endif
+
+#if !defined(WANT_SDL) || defined(HAS_NETSERVER)
 
 static int state;
 
 /* UNIX stuff */
 static pthread_t thread;
+#endif
 
 #ifdef HAS_NETSERVER
 static void ws_clear(void);
@@ -143,9 +155,14 @@ static void open_display(void)
 	window = SDL_CreateWindow("Vector Graphic HiRes",
 				  SDL_WINDOWPOS_UNDEFINED,
 				  SDL_WINDOWPOS_UNDEFINED,
-				  window_width, window_height, SDL_WINDOW_RESIZABLE);
+				  window_width, window_height,
+				  SDL_WINDOW_SHOWN|SDL_WINDOW_RESIZABLE);
 	renderer = SDL_CreateRenderer(window, -1, (SDL_RENDERER_ACCELERATED |
 						   SDL_RENDERER_PRESENTVSYNC));
+	canvas = SDL_CreateTexture(renderer,
+                                   SDL_PIXELFORMAT_RGBA8888,
+                                   SDL_TEXTUREACCESS_TARGET,
+                                   canvas_width, canvas_height);
 #else /* !WANT_SDL */
 	Window rootwindow;
 	XSizeHints *size_hints = XAllocSizeHints();
@@ -201,25 +218,35 @@ static void open_display(void)
 		XAllocColor(display, colormap, &grays[i]);
 	}
 
+	/* Create an XImage structure that points to our buffer */
+    	XMatchVisualInfo(display, screen, 24, TrueColor, &vinfo);
+    	canvas = malloc(canvas_width * canvas_height * 4);
+        ximage = XCreateImage(display, vinfo.visual, 24, ZPixmap, 0, (char *)canvas,
+                                  canvas_width, canvas_height, 32, 0);
+
 	/* XRenderExtension stuff */
     	if (XRenderQueryExtension(display, &first_event, &first_error)) {
-		XTransform transform;
-		has_xrender_extension = 1;
+		has_xrender_extension = true;
 		pict_format = XRenderFindVisualFormat(display, DefaultVisual(display, screen));
 		canvas_pic = XRenderCreatePicture(display, pixmap, pict_format, 0, NULL);
 		window_pic = XRenderCreatePicture(display, window, pict_format, 0, NULL);
-		scale_factor = 1.0;					
-		transform.matrix[0][0] = XDoubleToFixed(scale_factor);
+		transform.matrix[0][0] = XDoubleToFixed(1);
 		transform.matrix[0][1] = XDoubleToFixed(0);
 		transform.matrix[0][2] = XDoubleToFixed(0);
 		transform.matrix[1][0] = XDoubleToFixed(0);
-		transform.matrix[1][1] = XDoubleToFixed(scale_factor);
+		transform.matrix[1][1] = XDoubleToFixed(1);
 		transform.matrix[1][2] = XDoubleToFixed(0);
 		transform.matrix[2][0] = XDoubleToFixed(0);
 		transform.matrix[2][1] = XDoubleToFixed(0);
 		transform.matrix[2][2] = XDoubleToFixed(1);					
 		XRenderSetPictureTransform(display, canvas_pic, &transform);
 	}
+
+	/* Create an XImage structure that points to our buffer */
+    	XMatchVisualInfo(display, screen, 24, TrueColor, &vinfo);
+    	canvas = malloc(canvas_width * canvas_height * 4);
+        ximage = XCreateImage(display, vinfo.visual, 24, ZPixmap, 0, (char *)canvas,
+                                  canvas_width, canvas_height, 32, 0);
 
 	/* size hints */
 	size_hints->flags = PBaseSize | PMinSize | PMaxSize | PAspect;
@@ -250,15 +277,20 @@ static void close_display(void)
 #ifdef WANT_SDL
 	SDL_DestroyRenderer(renderer);
 	renderer = NULL;
+	SDL_DestroyTexture(canvas);
+	canvas = NULL;	
 	SDL_DestroyWindow(window);
 	window = NULL;
 #else
 	XLockDisplay(display);
+	ximage->data = NULL;
+	XDestroyImage(ximage);
 	XFreePixmap(display, pixmap);
 	XFreeGC(display, gc);
 	XUnlockDisplay(display);
 	XCloseDisplay(display);
 	display = NULL;
+	free(canvas);
 #endif
 }
 
@@ -305,17 +337,32 @@ static inline void fill_rect(int x, int y, int w, int h)
 
 static inline void set_fg_color(int i)
 {
-	XSetForeground(display, gc, colors[i].pixel);
+	fg = &colors[i];
 }
 
 static inline void set_fg_gray(int i)
 {
-	XSetForeground(display, gc, grays[i].pixel);
+	fg = &grays[i];
 }
 
 static inline void fill_rect(int x, int y, int w, int h)
 {
-	XFillRectangle(display, pixmap, gc, x, y, w, h);
+	register int i,j,x_max,y_max;
+    
+	x_max = x + w;
+	y_max = y + h;
+	if (x_max > canvas_width) x_max = canvas_width;
+	if (y_max > canvas_height) y_max = canvas_height;
+	   
+	for (j = y; j < y_max; j++) {
+	    for (i = x; i < x_max; i++) {
+	            long offset = ((j * canvas_width) + i) * 4;	/* RGBA */
+	            canvas[offset] = fg->blue;
+	            canvas[offset + 1] = fg->green;
+	            canvas[offset + 2] = fg->red;
+	            canvas[offset + 3] = 255;			/* alpha */
+	    }
+	}
 }
 
 #endif /* !WANT_SDL */
@@ -346,6 +393,7 @@ static void draw_frame()
 	int subrow, current_line, num_lines;
 	
 	current_line = 0;
+	frames++;
 
 	/* select foreground color for bilevel mode */
 	if (vector_graphic_hires_mode == BILEVEL) {
@@ -496,7 +544,8 @@ static void ws_refresh(void)
 /* function for updating the display */
 static void update_display(bool tick)
 {
-	uint64_t t,tleft;
+	uint64_t t;
+	int64_t tleft;
 
 	UNUSED(tick);
 
@@ -517,20 +566,26 @@ static void update_display(bool tick)
 	set_fg_color(0);
 	SDL_RenderClear(renderer);
 	if (state) {		/* draw frame if on */
+		SDL_SetRenderTarget(renderer, canvas);
+
 		draw_frame();
+
+		SDL_SetRenderTarget(renderer, NULL);
+		SDL_RenderCopy(renderer, canvas, NULL, NULL);
 		SDL_RenderPresent(renderer);
 
 		/* sleep rest to 16666 us so that we get 60 fps */
 		tleft = 16666L - (long) (get_clock_us() - t);
-		if (tleft > 0)
+		if (tleft > 0) {
 			sleep_for_us(tleft);
+		}
 
 		t = get_clock_us();
 	} else
 		SDL_RenderPresent(renderer);
 }
 
-static win_funcs_t hires_funcs = {
+static client_funcs_t hires_funcs = {
 	open_display,
 	close_display,
 	process_event,
@@ -540,7 +595,7 @@ static win_funcs_t hires_funcs = {
 
 #ifndef WANT_SDL
 /* process X11 events */
-static void process_event()
+static void process_event(int *width, int *height)
 {
 	XEvent event;
 	Atom actual_type, prop;
@@ -553,8 +608,10 @@ static void process_event()
 		case ConfigureNotify:
 			/* check for window resize event */
 			XConfigureEvent xce = event.xconfigure;
-			if ((xce.width != window_width) || (xce.height != window_height)){
+			if ((xce.width != *width) || (xce.height != *height)){
 				window_resized = true;
+				*width = xce.width;
+				*height = xce.height;
 			}
 			break;
 		case PropertyNotify:
@@ -568,6 +625,9 @@ static void process_event()
 	                            prop = (((Atom*)dp)[i]);
 	                            if ((prop == wm_focused) || (prop == wm_maxhorz) || (prop == wm_maxvert)) {
 					window_resized = true;
+					XGetWindowAttributes(display, window, &wa);
+					*width = wa.width;
+					*height = wa.height;
 				    }
 				}
 			    }
@@ -583,7 +643,8 @@ static void process_event()
 /* thread for updating the X11 display or web server */
 static void *update_thread(void *arg)
 {
-	uint64_t t,tleft;
+	uint64_t t;
+	int64_t tleft;
 
 	UNUSED(arg);
 
@@ -597,16 +658,10 @@ static void *update_thread(void *arg)
 			if (!n_flag) {
 #endif
 #ifndef WANT_SDL
-				process_event();
+				process_event(&window_width, &window_height);
 				if (window_resized) {
-					XGetWindowAttributes(display, window, &wa);
-					window_width = wa.width;
-					window_height = wa.height;
-					/* make sure we have a the correct aspect ratio even if the wm ignores the size hints */
 					window_width = (window_height * 16) / 15;
 					if (has_xrender_extension) {
-						XResizeWindow(display, window, window_width, window_height);
-						XTransform transform;
 						double scale_factor_x = (double)canvas_width / (double)window_width;					
 						double scale_factor_y = (double)canvas_height / (double)window_height;					
 						transform.matrix[0][0] = XDoubleToFixed(scale_factor_x);
@@ -623,20 +678,23 @@ static void *update_thread(void *arg)
 						/* prohibit resize */
 						window_width = canvas_width;
 						window_height = canvas_height;
-						XResizeWindow(display, window, window_width, window_height);
 					}
+					XResizeWindow(display, window, window_width, window_height);
 					window_resized = false;
 				}
 				XLockDisplay(display);
 				set_fg_color(0);
 				fill_rect(0, 0, window_width, window_height);
 	        		draw_frame();
+
 				if (has_xrender_extension) {
+					XPutImage(display, pixmap, gc, ximage, 0, 0, 0, 0, canvas_width, canvas_height);
+					XRenderSetPictureTransform(display, canvas_pic, &transform);
 				        XRenderComposite(display, PictOpSrc, canvas_pic, 0, window_pic,
 				                         0, 0, 0, 0, 0, 0, window_width, window_height);
 				}
 				else {
-					XCopyArea(display, pixmap, window, gc, 0, 0, window_width, window_height, 0, 0);
+					XPutImage(display, window, gc, ximage, 0, 0, 0, 0, canvas_width, canvas_height);
 				}
 				XSync(display, True);
 				XUnlockDisplay(display);
@@ -666,37 +724,39 @@ static void *update_thread(void *arg)
 void vector_graphic_hires_init()
 {
 #ifdef HAS_NETSERVER
-		if (!n_flag) {
+	if (!n_flag) {
 #endif
 #ifdef WANT_SDL
-			if (hires_win_id < 0)
-				hires_win_id = simsdl_create(&hires_funcs);
+		if (hires_client_id < 0)
+			hires_client_id = simsdl_create(&hires_funcs);
 #else
-			if (display == NULL)
-				open_display();
+		if (display == NULL)
+			open_display();
 #endif
 #ifdef HAS_NETSERVER
-		} else {
-			if (!state)
-				ws_clear();
-		}
+	} else {
+		if (!state)
+			ws_clear();
+	}
 #endif
-		state = true;
+	state = true;
 #if defined(WANT_SDL) && defined(HAS_NETSERVER)
-		if (n_flag) {
+	if (n_flag) {
 #endif
 #if !defined(WANT_SDL) || defined(HAS_NETSERVER)
-			if (thread == 0) {
-				if (pthread_create(&thread, NULL, update_thread,
-						   NULL)) {
-					LOGE(TAG, "can't create thread");
-					exit(EXIT_FAILURE);
-				}
+		if (thread == 0) {
+			if (pthread_create(&thread, NULL, update_thread,
+					   NULL)) {
+				LOGE(TAG, "can't create thread");
+				exit(EXIT_FAILURE);
 			}
-#endif
-#if defined(WANT_SDL) && defined(HAS_NETSERVER)
 		}
 #endif
+#if defined(WANT_SDL) && defined(HAS_NETSERVER)
+	}
+#endif
+	start_time = get_clock_us();
+	frames = 0;
 }
 
 #if !defined(WANT_SDL) || defined(HAS_NETSERVER)
@@ -720,9 +780,9 @@ void vector_graphic_hires_off(void)
 #ifdef HAS_NETSERVER
 	if (!n_flag) {
 #endif
-		if (hires_win_id >= 0) {
-			simsdl_destroy(hires_win_id);
-			hires_win_id = -1;
+		if (hires_client_id >= 0) {
+			simsdl_destroy(hires_client_id);
+			hires_client_id = -1;
 		}
 #ifdef HAS_NETSERVER
 	} else {
@@ -739,6 +799,11 @@ void vector_graphic_hires_off(void)
 		ws_clear();
 #endif
 #endif /* !WANT_SDL */
+
+#if 0
+	double delta = (get_clock_us() - start_time) / 1000000.0;
+	printf("HiRes: delta=%fs, frames/s=%f\r\n", delta, frames / delta);
+#endif
 }
 
 #endif /* HAS_VECTOR_GRAPHIC_HIRES */

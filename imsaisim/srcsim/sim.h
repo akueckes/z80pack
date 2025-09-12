@@ -59,7 +59,7 @@
 #define HAS_D7A	        /* has simulated I/O for Cromemco D+7A */
 
 //#define HAS_NOISEMAKER			/* has simulated I/O for ADS Noisemaker */
-//#define HAS_VECTOR_GRAPHIC_HIRES	/* has has simulated I/O for Vector Graphic High Resolution board */
+#define HAS_VECTOR_GRAPHIC_HIRES	/* has has simulated I/O for Vector Graphic High Resolution board */
 
 #define HAS_DISKS	/* uses disk images */
 #define HAS_CONFIG	/* has configuration files somewhere */

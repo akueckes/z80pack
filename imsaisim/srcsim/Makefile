@@ -166,6 +166,7 @@ endif
 # Debug - use `DEBUG=1 make build`
 ifneq ($(DEBUG),)
 COPTS = -O -g
+#-O0 -ggdb
 endif
 
 CFLAGS = $(CSTDS) $(COPTS) $(CWARNS)

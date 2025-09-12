@@ -1419,7 +1419,7 @@ static void update_display(bool tick)
 	SDL_RenderPresent(renderer);
 }
 
-static win_funcs_t panel_funcs = {
+static client_funcs_t panel_funcs = {
 	open_display,
 	close_display,
 	process_event,

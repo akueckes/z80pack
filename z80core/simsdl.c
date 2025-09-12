@@ -25,7 +25,7 @@
 #include <SDL_mixer.h>
 #endif
 
-#define MAX_WINDOWS 5
+#define MAX_CLIENTS 8
 
 static int sim_thread_func(void *data);
 
@@ -34,23 +34,17 @@ typedef struct args {
 	char **argv;
 } args_t;
 
-typedef struct window {
+typedef struct client {
 	bool in_use;
 	bool is_new;
 	bool quit;
-	win_funcs_t *funcs;
-} window_t;
+	client_funcs_t *funcs;
+} client_t;
+
+static client_t client[MAX_CLIENTS];
+static bool sim_finished;	/* simulator thread finished flag */
 
 int sdl_num_joysticks = 0;
-int sdl_joystick_0_x_axis = 0;
-int sdl_joystick_0_y_axis = 0;
-int sdl_joystick_1_x_axis = 0;
-int sdl_joystick_1_y_axis = 0;
-BYTE sdl_joystick_0_buttons = 0;
-BYTE sdl_joystick_1_buttons = 0;
-
-static window_t win[MAX_WINDOWS];
-static bool sim_finished;	/* simulator thread finished flag */
 
 int main(int argc, char *argv[])
 {
@@ -63,17 +57,10 @@ int main(int argc, char *argv[])
 
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0) {
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK) < 0) {
 		fprintf(stderr, "Can't initialize SDL: %s\n", SDL_GetError());
 		return EXIT_FAILURE;
 	}
-
-	/* check for joysticks */
-	sdl_num_joysticks = SDL_NumJoysticks();
-	for (i=0; i<sdl_num_joysticks; i++) {
-        	if (SDL_JoystickOpen(i) == NULL)
-            		fprintf(stderr, "SDL: error reading joystick %d\n", i);
-        }
 
 #ifdef FRONTPANEL
 	i = IMG_INIT_JPG | IMG_INIT_PNG;
@@ -103,90 +90,37 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	for (i=0; i<MAX_CLIENTS; i++) client[i].in_use = false;
+
 	tick = true;
 	t1 = SDL_GetTicks64() + 1000;
 	while (!quit) {
 		/* process event queue */
 		while (SDL_PollEvent(&event) != 0) {
 			switch(event.type) {
-			case SDL_JOYAXISMOTION:
-				switch(event.jdevice.which) {
-					case 0:
-						switch(event.jaxis.axis) {
-							case 0:
-								sdl_joystick_0_x_axis = event.jaxis.value;
-								break;
-							case 1:
-								sdl_joystick_0_y_axis = event.jaxis.value;
-								break;
-							default:;
-						}
-						break;
-					case 1:
-						switch(event.jaxis.axis) {
-							case 0:
-								sdl_joystick_1_x_axis = event.jaxis.value;
-								break;
-							case 1:
-								sdl_joystick_1_y_axis = event.jaxis.value;
-								break;
-							default:;
-						}
-						break;
-					default:;
-				}
-				break;
-			case SDL_JOYHATMOTION:
-				break;
-			case SDL_JOYBUTTONDOWN:
-				switch(event.jdevice.which) {
-					case 0:
-						sdl_joystick_0_buttons |= 1 << event.jbutton.button;
-						break;
-					case 1:
-						sdl_joystick_1_buttons |= 1 << event.jbutton.button;
-						break;
-					default:;
-				}	
-				break;
-			case SDL_JOYBUTTONUP:
-				switch(event.jdevice.which) {
-					case 0:
-						sdl_joystick_0_buttons &= ~(1 << event.jbutton.button);
-						break;
-					case 1:
-						sdl_joystick_1_buttons &= ~(1 << event.jbutton.button);
-						break;
-					default:;
-				}	
-				break;
-			case SDL_JOYDEVICEADDED:
-				break;
-			case SDL_JOYDEVICEREMOVED:
-				break;
 			case SDL_QUIT:
 				quit = true;
 				break;
-			default:;
+			default:
+				/* event etc. */
+				for (i = 0; i < MAX_CLIENTS; i++)
+					if (client[i].in_use && client[i].funcs->event)
+						(*client[i].funcs->event)(&event);
 			}
-
-			for (i = 0; i < MAX_WINDOWS; i++)
-				if (win[i].in_use)
-					(*win[i].funcs->event)(&event);
 		}
 
-		/* open/close/draw windows */
-		for (i = 0; i < MAX_WINDOWS; i++)
-			if (win[i].in_use) {
-				if (win[i].quit) {
-					(*win[i].funcs->close)();
-					win[i].in_use = false;
+		/* open/close/draw clients/windows */
+		for (i = 0; i < MAX_CLIENTS; i++)
+			if (client[i].in_use) {
+				if (client[i].quit) {
+					if (client[i].funcs->close) (*client[i].funcs->close)();
+					client[i].in_use = false;
 				} else {
-					if (win[i].is_new) {
-						(*win[i].funcs->open)();
-						win[i].is_new = false;
+					if (client[i].is_new) {
+						if (client[i].funcs->open) (*client[i].funcs->open)();
+						client[i].is_new = false;
 					}
-					(*win[i].funcs->draw)(tick);
+					if (client[i].funcs->draw) (*client[i].funcs->draw)(tick);
 				}
 			}
 
@@ -201,9 +135,10 @@ int main(int argc, char *argv[])
 
 	SDL_WaitThread(sim_thread, &status);
 
-	for (i = 0; i < MAX_WINDOWS; i++)
-		if (win[i].in_use)
-			(*win[i].funcs->close)();
+	for (i = 0; i < MAX_CLIENTS; i++)
+		if (client[i].in_use) {
+			if (client[i].funcs->close) (*client[i].funcs->close)();
+		}
 
 #ifdef FRONTPANEL
 	Mix_CloseAudio();
@@ -216,21 +151,21 @@ int main(int argc, char *argv[])
 }
 
 /* this is called from the simulator thread */
-int simsdl_create(win_funcs_t *funcs)
+int simsdl_create(client_funcs_t *funcs)
 {
 	int i;
 
-	for (i = 0; i < MAX_WINDOWS; i++)
-		if (!win[i].in_use) {
-			win[i].is_new = true;
-			win[i].quit = false;
-			win[i].funcs = funcs;
-			win[i].in_use = true;
+	for (i = 0; i < MAX_CLIENTS; i++)
+		if (!client[i].in_use) {
+			client[i].is_new = true;
+			client[i].quit = false;
+			client[i].funcs = funcs;
+			client[i].in_use = true;
 			break;
 		}
 
-	if (i == MAX_WINDOWS) {
-		fprintf(stderr, "No more window slots left\n");
+	if (i == MAX_CLIENTS) {
+		fprintf(stderr, "No more client slots left\n");
 		i = -1;
 	}
 
@@ -240,8 +175,8 @@ int simsdl_create(win_funcs_t *funcs)
 /* this is called from the simulator thread */
 void simsdl_destroy(int i)
 {
-	if (i >= 0 && i < MAX_WINDOWS)
-		win[i].quit = true;
+	if (i >= 0 && i < MAX_CLIENTS)
+		client[i].quit = true;
 }
 
 /* this thread runs the simulator */

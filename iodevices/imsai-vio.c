@@ -70,7 +70,7 @@ static int xsize, ysize;		/* window size */
 static int xscale, yscale;
 static int sx, sy;
 #ifdef WANT_SDL
-static int vio_win_id = -1;
+static int vio_client_id = -1;
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *texture;
@@ -212,9 +212,9 @@ void imsai_vio_off(void)
 #ifdef HAS_NETSERVER
 	if (!n_flag) {
 #endif
-		if (vio_win_id >= 0) {
-			simsdl_destroy(vio_win_id);
-			vio_win_id = -1;
+		if (vio_client_id >= 0) {
+			simsdl_destroy(vio_client_id);
+			vio_client_id = -1;
 		}
 #ifdef HAS_NETSERVER
 	} else
@@ -678,7 +678,7 @@ static void update_display(bool tick)
 	SDL_RenderPresent(renderer);
 }
 
-static win_funcs_t vio_funcs = {
+static client_funcs_t vio_funcs = {
 	open_display,
 	close_display,
 	process_event,
@@ -740,8 +740,8 @@ void imsai_vio_init(void)
 	if (!n_flag) {
 #endif
 #ifdef WANT_SDL
-		if (vio_win_id < 0)
-			vio_win_id = simsdl_create(&vio_funcs);
+		if (vio_client_id < 0)
+			vio_client_id = simsdl_create(&vio_funcs);
 #else
 		if (display == NULL)
 			open_display();

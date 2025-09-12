@@ -44,5 +44,7 @@ extern double d7a_sync_adjust;
 extern char *d7a_soundfile;
 extern long d7a_recording_limit;
 extern bool d7a_stats;
+extern int *d7a_axis_map;
+extern int *d7a_button_map;
 
 #endif /* !CROMEMCO_DPLUS7A_INC */

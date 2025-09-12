@@ -401,7 +401,7 @@ static void update_display(bool tick)
 	}
 }
 
-static win_funcs_t proctec_funcs = {
+static client_funcs_t proctec_funcs = {
 	open_display,
 	close_display,
 	process_event,
