@@ -13,7 +13,7 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 
 ## General notes/limitations:
 - machines cromemcosim and imsaisim are used as examples how to enable and pre-configure the new hardware emulations (see sim.h, simio.c, simcfg.c and system.conf files)
-- Sound cards, joysticks and high resolution graphics currently operate in command line mode only, the z80pack web frontend is missing the appropriate Javascript support (library needs to be updated). Also, there is a bug in the Javascript library which affects the correct rendering of 4x4 (=monochrome) video mode.
+- Sound cards, joysticks and high resolution graphics currently operate in command line mode only, the z80pack web frontend is missing the appropriate Javascript support (library needs to be updated). Also, there is a bug in the Javascript library which affects the correct rendering of 4x4 (=monochrome) video mode for the Dazzler emulation.
 - be aware that implementations based on non-realtime multi-tasking OS like Windows or Linux will never achieve fully correct timing in emulations. The z80pack core implementation tries to provide in average a roughly correct CPU clock, but doesn't implement continuous timing accuracy.
 - SDL2 under certain conditions seems to create noise with a phase directly related to the selected audio buffer size, probably when calling the audio callback function. Only seen with Ubuntu (libsdl2-2.0-0 version 2.30.0+dfsg-1ubuntu3.1), no fix yet.
 
