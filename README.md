@@ -105,7 +105,7 @@ sudo apt install mesa-libGL-devel libjpeg-devel libXrender-devel
 ```
 For SDL2, also install
 ```
-sudo dnf install git SDL2 SDL2-devel SDL2_mixer SDL2_mixer-devel SDL2_image SDL2_image-devel
+sudo dnf install SDL2 SDL2-devel SDL2_mixer SDL2_mixer-devel SDL2_image SDL2_image-devel
 ```	
 2. Get the latest z80pack sources
 ```
