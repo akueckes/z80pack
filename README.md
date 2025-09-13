@@ -7,7 +7,7 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - joystick support (Cromemco D+7A) with common game controllers
 - more accurate Cromemco Dazzler emulation (performance rendering, interlaced display, line status flag, window resize etc.)
 - support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board)
-- Cromemco Dazzler and D+7A boards now can be individually selected via seperate build switch
+- Cromemco Dazzler and D+7A boards now can be individually selected via separate build switch
 
 ## General notes/limitations:
 - cromemcosim and imsaisim are used as examples how to enable and pre-configure the added hardware emulations
