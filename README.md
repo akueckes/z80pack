@@ -34,12 +34,12 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - joystick 2 uses the upper 4 bits of port 24 for buttons input (pressed=0), port 27 for x-axis input and audio output, and port 28 for y-axis input
 - audio port 25 is mapped to the left audio channel, audio port 27 is mapped to the right audio channel
 - additional config settings in the system.conf file:
-	- set **d7a_sample_rate** as an integer for the sampling rate of the audio framework
-	- set **d7a_sync_adjust** as a floating point number to adjust the sound buffer processing speed (to reach the optimum balance between buffer overflows and underflows)
-	- set **d7a_buffer_size** as an integer for the size of the sample buffer (limits the processing delay)
+	- set **d7a_sample_rate** as an integer for the sampling rate of the audio framework in samples/second
+	- set **d7a_sync_adjust** as a floating point number to adjust the sound buffer processing speed with a multiplier (in order to reach the optimum balance between buffer overflows and underflows), where a value of 1.0 means no change
+	- set **d7a_buffer_size** as an integer for the size of the sample buffer in samples (limits the processing delay)
   	- set **d7a_soundfile** as a string for the filename of the recording file (also enables recording)
-  	- set **d7a_recording_limit** as an integer for the total number of samples to limit the size of a recording
-  	- set **d7a_stats** to 1 for printing some audio stats when shutting down the emulator
+  	- set **d7a_recording_limit** as an integer for the maximum number of samples to limit the size of a recording
+  	- set **d7a_stats** to 1 for printing some audio stats when shutting down the emulator (can be used for tuning the balance of buffer over- and underflows)
  - audio and joystick/game controller support in Linux is not standardized, sometimes it works out of the box, sometimes it requires additional configurations. Especially game controller support might include rebuilding the kernel (this version of z80pack reports joysticks found during start-up of the emulation). Hint: check for files /dev/inputs/js* and /dev/inputs/event*. Also, passing through game controllers via WSL requires special handling.
  - some game controllers come with an integrated audio device, be aware that audio output might be routed to this device when being plugged in (no sound on all other devices). You might think about disabling the game controller's audio device.
 
