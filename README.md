@@ -7,11 +7,13 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - joystick support (Cromemco D+7A) with common game controllers
 - more accurate Cromemco Dazzler emulation (performance rendering, interlaced display, line status flag, window resize etc.)
 - support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board)
-- Cromemco Dazzler and D+7A boards now can be individually selected via separate build switch
+- Cromemco Dazzler and D+7A boards now can be individually selected via separate build switches
+- bugfix for Cromemco Cyclops emulation
+- more general structure for SDL2 clients (can also be windowless)
 
 ## General notes/limitations:
-- cromemcosim and imsaisim are used as examples how to enable and pre-configure the added hardware emulations
-- Sound cards, joysticks and high resolution graphics currently operate in command line mode only, the web frontend is missing the appropriate Javascript support (library needs to be updated)
+- machines cromemcosim and imsaisim are used as examples how to enable and pre-configure the new hardware emulations (see sim.h, simio.c, simcfg.c and system.conf files)
+- Sound cards, joysticks and high resolution graphics currently operate in command line mode only, the z80pack web frontend is missing the appropriate Javascript support (library needs to be updated)
 - be aware that implementations based on non-realtime multi-tasking OS like Windows or Linux will never achieve fully correct timing in emulations. The z80pack core implementation tries to provide in average a roughly correct CPU clock, but doesn't implement continuous timing accuracy.
 
 ## Notes on Cromemco Dazzler
