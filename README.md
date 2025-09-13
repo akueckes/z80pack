@@ -103,7 +103,7 @@ In general, the X server integrated in WSL2 (WSLg) is special in certain aspects
 sudo dnf group install development-tools
 sudo apt install mesa-libGL-devel libjpeg-devel libXrender-devel
 ```
-For SDL2, also install
+	For SDL2, also install
 ```
 sudo dnf install git SDL2 SDL2-devel SDL2_mixer SDL2_mixer-devel SDL2_image SDL2_image-devel
 ```	
@@ -116,7 +116,7 @@ git clone https://github.com/akueckes/z80pack.git
 cd z80pack
 WANT_PORTAUDIO=YES make
 ```
-or for SDL2 with
+	or for SDL2 with
 ```
 cd z80pack
 WANT_SDL=YES make
