@@ -111,7 +111,12 @@ sudo dnf install git SDL2 SDL2-devel SDL2_mixer SDL2_mixer-devel SDL2_image SDL2
 ```
 git clone https://github.com/akueckes/z80pack.git
 ```
-3. Build z80pack
+3. Build z80pack for X11 and PortAudio with
+```
+cd z80pack
+WANT_PORTAUDIO=YES make
+```
+or for SDL2 with
 ```
 cd z80pack
 WANT_SDL=YES make
