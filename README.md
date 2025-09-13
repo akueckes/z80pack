@@ -47,8 +47,8 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 ## Notes on ADS Noisemaker
 - define HAS_NOISEMAKER in the appropriate sim.h file to enable this emulation
 - uses two AY-3-8910 programmed sound generators for stereo synthesis with 6 independent tone channels and 2 noise channels
-- build z80pack with WANT_SDL=YES to use SDL2 framework for sound (recommended)
-- alternatively, build z80pack with WANT_PORTAUDIO=YES to use the PortAudio framework for sound
+- build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
+- alternatively, build z80pack with WANT_SDL=YES to use SDL2 framework for display, joysticks and sound
 - additional config settings in the system.conf file:
 	- set **noisemaker_sample_rate** as an integer for the sampling rate of the audio framework in samples/second
  	- set **noisemaker_soundfile** as a string for the filename of the recording file (also enables recording)
