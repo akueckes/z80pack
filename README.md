@@ -27,7 +27,7 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 ## Notes on Cromemco D+7A
 - define HAS_D7A in the appropriate sim.h file to enable this emulation
 - the D+7A now supports both audio playback and joystick inputs
-- can be configured to produce a sound file as recording of an audio sequence
+- can be configured to produce a WAV file as recording of an audio sequence
 - build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
 - alternatively, build z80pack with WANT_SDL=YES to use SDL2 framework for display, joysticks and sound
 - emulates two JS-1 joysticks with integrated speaker (assigned to left and right audio channel, respectively)
@@ -38,7 +38,7 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 	- set **d7a_sample_rate** as an integer for the sampling rate of the audio framework in samples/second
 	- set **d7a_sync_adjust** as a floating point number to adjust the sound buffer processing speed with a multiplier (in order to reach the optimum balance between buffer overflows and underflows), where a value of 1.0 means no change
 	- set **d7a_buffer_size** as an integer for the size of the sample buffer in samples (limits the processing delay)
-  	- set **d7a_soundfile** as a string for the filename of the recording file (also enables recording)
+  	- set **d7a_soundfile** as a string for the filename of the recording WAV file (also enables recording)
   	- set **d7a_recording_limit** as an integer for the maximum number of samples to limit the size of a recording
   	- set **d7a_stats** to 1 for printing some audio stats when shutting down the emulator (can be used for tuning the balance of buffer over- and underflows)
  - audio and joystick/game controller support in Linux is not standardized, sometimes it works out of the box, sometimes it requires additional configurations. Especially game controller support might include rebuilding the kernel (this version of z80pack reports joysticks found during start-up of the emulation). Hint: check for files /dev/inputs/js* and /dev/inputs/event*. Also, passing through game controllers via WSL requires special handling.
@@ -47,11 +47,12 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 ## Notes on ADS Noisemaker
 - define HAS_NOISEMAKER in the appropriate sim.h file to enable this emulation
 - uses two AY-3-8910 programmed sound generators for stereo synthesis with 6 independent tone channels and 2 noise channels
+- can record a certain amount of playback into a user selected WAV file
 - build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
 - alternatively, build z80pack with WANT_SDL=YES to use SDL2 framework for display, joysticks and sound
 - additional config settings in the system.conf file:
 	- set **noisemaker_sample_rate** as an integer for the sampling rate of the audio framework in samples/second
- 	- set **noisemaker_soundfile** as a string for the filename of the recording file (also enables recording)
+ 	- set **noisemaker_soundfile** as a string for the filename of the recording WAV file (also enables recording)
 	- set **noisemaker_recording_limit** as an integer for the maximum number of samples to limit the size of a recording
 
 ## Notes on Vector Graphic HiRes Graphics
