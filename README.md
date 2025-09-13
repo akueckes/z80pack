@@ -122,9 +122,9 @@ or for SDL2 with
 cd z80pack
 WANT_SDL=YES make
 ```
-4. Test the emulator e.g. with Cromemco emulation
+4. Test the emulator e.g. with Imsai emulation
 ```
-cd cromemcosim
+cd imsaisim
 ./cpm22
 ```
 
