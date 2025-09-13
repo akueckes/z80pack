@@ -85,8 +85,8 @@ usbipd list
 ```
 Your game controller should be listed with its bus-id under "Connected:". Then bind & attach the device to the running WSL instance with
 ```
-	usbipd bind --busid <bus-id>
-	usbipd attach --wsl --busid <bus-id>
+usbipd bind --busid <bus-id>
+usbipd attach --wsl --busid <bus-id>
 ```
 Check with 'lsusb' in the WSL console, whether the device gets listed.
 
