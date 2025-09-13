@@ -3,21 +3,22 @@
 z80pack is a mature emulator of multiple platforms with 8080 and Z80 CPU.
 
 This fork adds a couple of features to Udo Munk's original upstream project:
-- support for S100 sound cards with SDL2 and PortAudio audio frameworks (currently supported Cromemco D+7A and ADS Noisemaker)
-- joystick support (Cromemco D+7A) with common USB game controllers
-- more accurate Cromemco Dazzler emulation (interlaced display, line status flag, window resize etc.)
-- support for higher resolution S100 monochrome graphics (currently supported Vector Graphic High Resolution graphics board)
-- build switches for Cromemco Dazzler and D+7A boards have been separated in order also to allow combinations with other sound hardware, see cromemcosim and imsaisim for an example implementation
+- support for S100 sound cards with SDL2 and PortAudio sound frameworks (currently used by Cromemco D+7A and ADS Noisemaker emulation)
+- joystick support (Cromemco D+7A) with common game controllers
+- more accurate Cromemco Dazzler emulation (performance rendering, interlaced display, line status flag, window resize etc.)
+- support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board)
+- Cromemco Dazzler and D+7A boards now can be individually selected via seperate build switch
 
 ## General notes/limitations:
 - cromemcosim and imsaisim are used as examples how to enable and pre-configure the added hardware emulations
-- Sound cards, joysticks or high resolution graphics currently works in command line mode only, not with the web frontend (Javascript library needs to be updated)
-- be aware that implementations based on non-realtime multi-tasking OS like Windows or Linux will never achieve fully correct timing in emulations. The z80pack implementation tries to provide a roughly correct CPU clock in average over certain periods of time, but won't implement continuous timing accuracy, which in general limits applications which are based on tight timings with less than one millisecond accuracy
+- Sound cards, joysticks and high resolution graphics currently operate in command line mode only, the web frontend is missing the appropriate Javascript support (library needs to be updated)
+- be aware that implementations based on non-realtime multi-tasking OS like Windows or Linux will never achieve fully correct timing in emulations. The z80pack core implementation tries to provide in average a roughly correct CPU clock, but doesn't implement continuous timing accuracy.
 
 ## Notes on Cromemco Dazzler
 - define HAS_DAZZLER in the appropriate sim.h file to enable this emulation
 - additional config settings in the system.conf file:
 	- set **dazzler_interlaced** to 1 to enable interlaced display for the Dazzler
+	- set **dazzler_line_sync** to 1 for enabling the odd-even-line status flag
 	- set **dazzler_discrete_scale** to 1 if you prefer window sizing with full multiples of the pixel count
 
 ## Notes on Cromemco D+7A
@@ -63,23 +64,46 @@ Full documentation of the upstream project is at https://www.icl1900.co.uk/unix4
 In addition to Udo Munk's instructions on Ubuntu, below are the steps to bild z80pack also on Fedora Linux based on this repo.
 
 ## PortAudio notes
-The PortAudio sound framework can be selected instead of SDL2 for emulation of devices which support audio (e.g. with D+7A emulation). First make sure the proper packages are installed (portaudio-devel for Fedora and portaudio19-dev for Debian/Ubuntu). Then use 'WANT_PORTAUDIO=YES make' for building z80pack with support for the PortAudio framework.
+The PortAudio sound framework can be selected instead of SDL2 for emulation of devices which support audio (e.g. Cromemco D+7A and ADS Noisemaker emulation). First make sure the proper packages are installed (portaudio-devel for Fedora, and portaudio19-dev for Debian/Ubuntu). Then use 'WANT_PORTAUDIO=YES make' for building z80pack with support for the PortAudio framework. For using Windows Subsystem for Linux (WSL) there may be additional steps required (see WSL section below).
 
 ## WSL notes
-Since the later revisions, the use of z80pack under MS Windows is normally achieved via WSL2. Passing through audio to the host hardware normally is not much of a problem, since with Windows 11, WSL passes audio via a separate PulseAudio server to the Windows audio system. For using USB game controllers within WSL, you have to bind and attach the game controller with usbipd-win to the running WSL instance.
+Since the later revisions, the use of z80pack under MS Windows is normally achieved via WSL2. Since Windows 11, WSL passes audio via an intermediate PulseAudio server to the Windows audio system. With SDL2, this should not be a problem. For PortAudio, most ready-to-use PortAudio packages do NOT support PulseAudio out of the box, since PulseAudio has been replaced by ALSA + PipeWire in recent Linux distros. In that case you will get a "PortAudio: Could not open default stream" error message (among others). The solution is to re-build the PortAudio package with enabling PulseAudio support:
+```
+git clone https://github.com/PortAudio/portaudio.git
+cd portaudio
+./configure --with-pulseaudio=yes --with-alsa=no
+make
+sudo make install
+```
+Reboot to make the changes effective.
 
-There are, however, a couple of caveats. First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Second, the WSL Linux kernel probably will not be configured out-of-the-box for supporting game controllers. Consequently, you will have to change the kernel configuration, rebuild the kernel and activate it for WSL.
+For using USB game controllers within WSL, you have to bind and attach the game controller with usbipd-win to the running WSL instance. Plug in your joystick, open a Windows command shell, and list the available USB devices with
+```
+usbipd list
+```
+Your game controller should be listed with its bus-id under "Connected:". Then bind & attach the device to the running WSL instance with
+```
+	usbipd bind --busid <bus-id>
+	usbipd attach --wsl --busid <bus-id>
+```
+Check with 'lsusb' in the WSL console, whether the device gets listed.
+
+There are, however, a couple of caveats. First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Second, the WSL Linux kernel probably will not be configured out-of-the-box for supporting game controllers. You might have to change the kernel configuration, rebuild the kernel and activate it for WSL.
 
 If a USB game controller also integrates audio hardware, your Linux in the WSL instance possibly automatically activates its own audio server such as PipeWire (if installed) for handling the newly detected audio hardware, which cuts the connection to WSL's PulseAudio server, so that all audio output will be routed to the game controller's audio hardware instead of the host's Windows audio system. You might need to deactivate the guest Linux' own audio server in order to re-establish the use of WSL's PulseAudio server.
 
-In general, the X server integrated in WSL2 (WSLg) is special in certain aspects. Some X window functions such as resize are somewhat strange. I'd recommend using GWSL (https://opticos.github.io/gwsl/) instead.
+In general, the X server integrated in WSL2 (WSLg) is special in certain aspects. Some X window functions such as resize are handled in a somewhat strange way. I'd recommend using GWSL (https://opticos.github.io/gwsl/) instead.
 
 ## Fedora
 
 1. Install the packages required for z80pack
 ```
 sudo dnf group install development-tools
-sudo dnf install git SDL2 SDL2-devel SDL2_mixer SDL2_mixer-devel SDL2_image SDL2_image-devel libXrender-devel
+sudo apt install mesa-libGL-devel libjpeg-devel libXrender-devel
+```
+For SDL2, also install
+```
+sudo dnf install git SDL2 SDL2-devel SDL2_mixer SDL2_mixer-devel SDL2_image SDL2_image-devel
 ```	
 2. Get the latest z80pack sources
 ```
