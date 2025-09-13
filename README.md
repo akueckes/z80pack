@@ -62,6 +62,9 @@ Full documentation of the upstream project is at https://www.icl1900.co.uk/unix4
 
 In addition to Udo Munk's instructions on Ubuntu, below are the steps to bild z80pack also on Fedora Linux based on this repo.
 
+## PortAudio notes
+The PortAudio sound framework can be selected instead of SDL2 for emulation of devices which support audio (e.g. with D+7A emulation). First make sure the proper packages are installed (portaudio-devel for Fedora and portaudio19-dev for Debian/Ubuntu). Then use 'WANT_PORTAUDIO=YES make' for building z80pack with support for the PortAudio framework.
+
 ## WSL notes
 Since the later revisions, the use of z80pack under MS Windows is normally achieved via WSL2. Passing through audio to the host hardware normally is not much of a problem, since with Windows 11, WSL passes audio via a separate PulseAudio server to the Windows audio system. For using USB game controllers within WSL, you have to bind and attach the game controller with usbipd-win to the running WSL instance.
 
