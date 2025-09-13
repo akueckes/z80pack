@@ -80,7 +80,7 @@ sudo make install
 ```
 Reboot to make the changes effective.
 
-For using USB game controllers within WSL, you have to bind and attach the game controller with usbipd-win to the running WSL instance. Plug in your joystick, open a Windows command shell, and list the available USB devices with
+WSL cannot forward blutetooth controllers to Linux. For using USB game controllers within WSL, you have to bind and attach the game controller with usbipd-win to the running WSL instance. Plug in your joystick, open a Windows command shell, and list the available USB devices with
 ```
 usbipd list
 ```
