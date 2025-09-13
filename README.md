@@ -49,17 +49,17 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - build z80pack with WANT_SDL=YES to use SDL2 framework for sound (recommended)
 - alternatively, build z80pack with WANT_PORTAUDIO=YES to use the PortAudio framework for sound
 - additional config settings in the system.conf file:
-	- set **noisemaker_sample_rate** as an integer for the sampling rate of the audio framework
+	- set **noisemaker_sample_rate** as an integer for the sampling rate of the audio framework in samples/second
  	- set **noisemaker_soundfile** as a string for the filename of the recording file (also enables recording)
-	- set **noisemaker_recording_limit** as an integer for the total number of samples to limit the size of a recording
+	- set **noisemaker_recording_limit** as an integer for the maximum number of samples to limit the size of a recording
 
 ## Notes on Vector Graphic HiRes Graphics
 - define HAS_VECTOR_GRAPHIC_HIRES in the appropriate sim.h file to enable this emulation
-- the Vector Graphic HiRes Graphics emulation uses a fixed window size (not resizable)
 - additional config settings in the system.conf file:
 	- set **vector_graphic_hires_mode** for the graphic mode either to "bilevel" or "halftone"
 	- set **vector_graphic_hires_address** as an integer for the start address of the video buffer in memory
 	- set **vector_graphic_hires_fg** as a triple of R,G,B values each between 0 and 255 for the foreground color (simulates a monochrome CRT display color)
+
 
 Full documentation of the upstream project is at https://www.icl1900.co.uk/unix4fun/z80pack
 
