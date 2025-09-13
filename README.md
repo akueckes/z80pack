@@ -30,8 +30,8 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
 - alternatively, build z80pack with WANT_SDL=YES to use SDL2 framework for display, joysticks and sound
 - emulates two JS-1 joysticks with integrated speaker (assigned to left and right audio channel, respectively)
-- joystick 1 uses the lower 4 bits of port 24 for buttons input (pressed=0), port 25 for x-axis input and audio output, and port 26 for y-axis input
-- joystick 2 uses the upper 4 bits of port 24 for buttons input (pressed=0), port 27 for x-axis input and audio output, and port 28 for y-axis input
+- joystick 1 uses the lower 4 bits of port 24 for buttons input (pressed=0, released=1), port 25 for x-axis input and audio output, and port 26 for y-axis input
+- joystick 2 uses the upper 4 bits of port 24 for buttons input (pressed=0, released=1), port 27 for x-axis input and audio output, and port 28 for y-axis input
 - audio port 25 is mapped to the left audio channel, audio port 27 is mapped to the right audio channel
 - additional config settings in the system.conf file:
 	- set **d7a_sample_rate** as an integer for the sampling rate of the audio framework in samples/second
