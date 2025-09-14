@@ -107,7 +107,7 @@ In general, the X server integrated in WSL2 (WSLg) is special in certain aspects
 1. Install the packages required for z80pack
 ```
 sudo dnf group install development-tools
-sudo apt install mesa-libGL-devel libjpeg-devel libXrender-devel
+sudo dnf install mesa-libGL-devel libjpeg-devel libXrender-devel
 ```
 For SDL2, also install
 ```
