@@ -89,7 +89,7 @@ Then build the PortAudio library & software
 ```
 git clone https://github.com/PortAudio/portaudio.git
 cd portaudio
-./configure --with-pulseaudio=yes --with-alsa=no
+./configure --with-pulseaudio=yes --with-alsa=no --with-jack=no --with-sndio=no
 make
 sudo make install
 ```
