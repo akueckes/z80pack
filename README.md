@@ -75,7 +75,17 @@ In addition to Udo Munk's instructions on Ubuntu, below are the steps to bild z8
 The PortAudio sound framework can be selected instead of SDL2 for emulation of devices which support audio (e.g. Cromemco D+7A and ADS Noisemaker emulation). First make sure the proper packages are installed (portaudio-devel for Fedora, and portaudio19-dev for Debian/Ubuntu). Then use 'WANT_PORTAUDIO=YES make' for building z80pack with support for the PortAudio framework. For using Windows Subsystem for Linux (WSL) there may be additional steps required (see WSL section below).
 
 ## WSL notes
-Since the later revisions, the use of z80pack under MS Windows is normally achieved via WSL2. Since Windows 11, WSL passes audio via an intermediate PulseAudio server to the Windows audio system. With SDL2, this should not be a problem. For PortAudio, most ready-to-use PortAudio packages do NOT support PulseAudio out of the box, since PulseAudio has been replaced by ALSA + PipeWire in recent Linux distros. In that case you will get a "PortAudio: Could not open default stream" error message (among others). The solution is to re-build the PortAudio package with enabling PulseAudio support:
+Since the later revisions, the use of z80pack under MS Windows is normally achieved via WSL2. Since Windows 11, WSL passes audio via an intermediate PulseAudio server to the Windows audio system. With SDL2, this should not be a problem. For PortAudio, most ready-to-use PortAudio packages do NOT support PulseAudio out of the box, since PulseAudio has been replaced by ALSA + PipeWire in recent Linux distros. In that case you will get a "PortAudio: Could not open default stream" error message (among others). The solution is to re-build the PortAudio package with enabling PulseAudio support.
+
+If not already present, install the PulseAudio packages for Fedora
+```
+sudo dnf install pulseaudio-libs-devel
+```
+or for Debian/Ubuntu
+```
+sudo apt install libpulse-dev
+```
+Then build the PortAudio library & software
 ```
 git clone https://github.com/PortAudio/portaudio.git
 cd portaudio
