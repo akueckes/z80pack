@@ -83,7 +83,7 @@ cd portaudio
 make
 sudo make install
 ```
-Reboot to make the changes effective.
+Reboot to make the changes effective. The shared library will be placed at /usr/local/lib. It might be necessary to make the location known to your loader.
 
 WSL cannot pass through bluetooth controllers to Linux. For using USB game controllers within WSL, you have to bind and attach the game controller with usbipd-win to the running WSL instance. Plug in your joystick, open a Windows command shell, and list the available USB devices with
 ```
