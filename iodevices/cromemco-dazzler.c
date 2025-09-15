@@ -250,6 +250,8 @@ static BYTE formatBuf = 0;
 
 /* stats data */
 static struct {
+	uint8_t flags[10][64];
+	uint8_t format[10][64];
 	int loop[10][64];
 	uint64_t T1[10][64];
 	uint64_t T2[10][64];
@@ -776,11 +778,11 @@ static Tstates_t dazzler_busmaster(BYTE bus_ack)
 */
 static void draw_field(int field)
 {
-	int bytepos, num_bytes, num_dma, num_lines, current_line, psize, offset, start, step, dma_cycle;
-	BYTE i;
-	int hires_subrow, vpos;
+	int bytepos, num_bytes, num_dma, num_lines, current_line, psize, offset, start, step, hires_subrow, vpos;
+	int dma_cycle = 0;
+	uint8_t i;
 
-	Tstates_t T_end_of_row;
+	Tstates_t T_end_of_row = 0;
 
 	frames++;
 	
@@ -822,10 +824,14 @@ static void draw_field(int field)
 
 			/* calculate DMA cycle in CPU ticks */
 			dma_cycle = (num_lines * f_value * 1000000) / 15980;;
+#ifdef PROFILER
 			if (row_data.frame_index < 10) {
 				row_data.cycle[row_data.frame_index] = dma_cycle;
 				row_data.T1[row_data.frame_index][row_data.row_index] = T;
+				row_data.flags[row_data.frame_index][row_data.row_index] = flags;
+				row_data.format[row_data.frame_index][row_data.row_index] = format;
 			}
+#endif
 			T_end_of_row = T + dma_cycle;
 
 			/* read data bytes into line buffer */
@@ -840,6 +846,14 @@ static void draw_field(int field)
 				line_buffer[bytepos] = dma_read(addr + offset);
 			}
 
+			if (format & 0x40) {	/* x4 mode */
+				if (format & 0x10) {
+					set_fg_color(format & 0xf);	/* color */
+				}
+				else {
+					set_fg_gray(format & 0xf);	/* grayscale */
+				}
+			}
 #ifdef BUSMASTER
 			/* simulate bus master activity */
 			if (dazzler_line_sync)
@@ -902,13 +916,14 @@ static void draw_field(int field)
 			
 		if (format & 0x40) {
 			/* check which subrow we're in */
-			hires_subrow = (current_line + start) / 3;
+			hires_subrow = (current_line + start) / psize;
 		}
 
 		/* post processing after last line */
 		if (current_line >= num_lines) {
 
 			if (dazzler_line_sync) {
+#ifdef PROFILER
 				/* collect some profiler data */
 				if (row_data.frame_index < 10) {
 					/* capture current CPU clock */
@@ -916,7 +931,7 @@ static void draw_field(int field)
 					/* ticks left until calculated end of DMA cycle */
 					row_data.headroom[row_data.frame_index][row_data.row_index] = T_end_of_row - T;
 				}
-	
+#endif
 				/* wait until beam reaches end of row */
 				int loop = 0;
 				do {
@@ -924,7 +939,7 @@ static void draw_field(int field)
 					nanosleep(&min_sleep_time, NULL);
 				}
 				while ((T < (T_end_of_row - ticks_per_nanosleep)) && (cpu_state == ST_CONTIN_RUN));
-
+#ifdef PROFILER
 				/* collect some more profiler data */
 				if (row_data.frame_index < 10) {
 					row_data.loop[row_data.frame_index][row_data.row_index] = loop;
@@ -939,6 +954,7 @@ static void draw_field(int field)
 						row_data.frame_index++;
 					}
 				}
+#endif
 				T_end_of_row += dma_cycle;
 			}
 
@@ -1340,7 +1356,7 @@ void cromemco_dazzler_ctl_out(BYTE data)
 		if (state) {
 			last_state = state;
 			state = false;
-#if 0
+#ifdef PROFILER
 			double delta = (get_clock_us() - start_time) / 1000000.0;
 			printf("Dazzler: delta=%fs, frames/s=%f\r\n", delta, frames / delta);
 			/* ouput debug data */
@@ -1348,17 +1364,18 @@ void cromemco_dazzler_ctl_out(BYTE data)
 				int frame, row;
 				for (frame=0; frame<row_data.frame_index; frame++) {
 					for (row=0; row<(format & 0x20 ? 64 : 32); row++) {
-						printf("frame=%d row=%d cycle=%d loops=%d processing=%lu headroom=%d nap=%lu rest=%d\r\n",
+						printf("frame=%d row=%d cycle=%d loops=%d processing=%lu headroom=%d nap=%lu rest=%d flags=%02X formatb=%02X\r\n",
 						frame, row, row_data.cycle[frame], row_data.loop[frame][row],
 						row_data.T2[frame][row] - row_data.T1[frame][row],
 						row_data.headroom[frame][row],
 						row_data.T3[frame][row] - row_data.T2[frame][row],
-						row_data.rest[frame][row]);
+						row_data.rest[frame][row],
+						row_data.flags[frame][row],
+						row_data.format[frame][row]);
 					}
 				}
 			}
 #endif
-
 
 #ifdef HAS_NETSERVER
 			sleep_for_ms(50);
