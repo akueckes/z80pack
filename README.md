@@ -77,6 +77,8 @@ The PortAudio sound framework can be selected instead of SDL2 for emulation of d
 ## WSL notes
 Since the later revisions, the use of z80pack under MS Windows is normally achieved via WSL2. Since Windows 11, WSL passes audio via an intermediate PulseAudio server to the Windows audio system. With SDL2, this should not be a problem. For PortAudio, most ready-to-use PortAudio packages do NOT support PulseAudio out of the box, since PulseAudio has been replaced by ALSA + PipeWire in recent Linux distros. In that case you will get a "PortAudio: Could not open default stream" error message (among others). The solution is to re-build the PortAudio package with enabling PulseAudio support.
 
+### Rebuilding PortAudio
+
 If not already present, install the PulseAudio packages for Fedora
 ```
 sudo dnf install pulseaudio-libs-devel
@@ -95,6 +97,8 @@ sudo make install
 ```
 Reboot to make the changes effective. The shared library will be placed at /usr/local/lib. It might be necessary to make the location known to your loader.
 
+### Controller support
+
 WSL cannot pass through bluetooth controllers to Linux. For using USB game controllers within WSL, you have to bind and attach the game controller with usbipd-win to the running WSL instance. Plug in your joystick, open a Windows command shell, and list the available USB devices with
 ```
 usbipd list
@@ -107,6 +111,8 @@ usbipd attach --wsl --busid <bus-id>
 Check with 'lsusb' in the WSL console, whether the device gets listed.
 
 There are, however, a couple of caveats. First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Second, the WSL Linux kernel probably will not be configured out-of-the-box for supporting game controllers. You might have to change the kernel configuration, rebuild the kernel and activate it for WSL.
+
+### Rebuilding the WSL2 kernel
 
 For rebuilding the kernel, follow in general the instructions in https://github.com/microsoft/WSL2-Linux-Kernel.
 
