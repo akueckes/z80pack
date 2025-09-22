@@ -163,6 +163,7 @@ If a USB game controller also integrates audio hardware, your Linux in the WSL i
 In general, the X server integrated in WSL2 (WSLg) is special in certain aspects. Window size hints seem to be widely ignored by WSL's window manager. You might consider using GWSL (https://opticos.github.io/gwsl/) instead.
 
 ## Fedora
+### Building
 
 1. Install the packages required for z80pack
 ```
