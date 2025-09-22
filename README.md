@@ -108,7 +108,7 @@ Check with 'lsusb' in the WSL console, whether the device gets listed.
 
 There are, however, a couple of caveats. First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Second, the WSL Linux kernel probably will not be configured out-of-the-box for supporting game controllers. You might have to change the kernel configuration, rebuild the kernel and activate it for WSL.
 
-For rebuilding the kernel, follow in general the instructions in https://github.com/microsoft/WSL2-Linux-Kernel. Make sure the following configurations are done with the kernel configuration tool menuconfig.
+For rebuilding the kernel, follow in general the instructions in https://github.com/microsoft/WSL2-Linux-Kernel.
 
 Don't forget to install first the required dependencies for Fedora
 
@@ -119,7 +119,9 @@ or  Debian/Ubuntu:
 
 	sudo apt install build-essential flex bison dwarves libssl-dev libelf-dev cpio qemu-utils libncurses-dev
 
-I'd also recommend to create a backup of your current kernel which is found in Windows at /Users/\<username\>/vmlinux (just in case something goes wrong).
+I'd also recommend to create a backup of your current kernel which is found in Windows at /Users/&lt;username&gt;/vmlinux (just in case something goes wrong).
+
+Make sure the following configuration changes are done with the kernel configuration tool menuconfig:
 
 Select
 	
