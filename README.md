@@ -108,6 +108,39 @@ Check with 'lsusb' in the WSL console, whether the device gets listed.
 
 There are, however, a couple of caveats. First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Second, the WSL Linux kernel probably will not be configured out-of-the-box for supporting game controllers. You might have to change the kernel configuration, rebuild the kernel and activate it for WSL.
 
+For rebuilding the kernel, follow in general the instructions in https://github.com/microsoft/WSL2-Linux-Kernel. Make sure the following configurations are done with the kernel configuration tool menuconfig:
+
+     Select
+	
+	-> General setup
+		-> Local version - append to kernel release (LOCALVERSION [=]) 
+
+     and enter -microsoft-standard-WSL2-joystick
+     
+     Then configure
+
+	-> Device Drivers
+		-> Input device support
+			-> Generic input layer (needed for keyboard, mouse, ...) (INPUT [=y])
+				-> Joystick interface (INPUT_JOYDEV [=y])
+				-> Event interface (INPUT_EVDEV [=y])
+
+	-> Device Drivers
+		-> USB support (USB_SUPPORT [=y])
+			-> USB/IP support (USBIP_CORE [=y])
+				-> VHCI hcd (USBIP_VHCI_HCD [=y])
+  
+      If you also need support for Microsoft XPad, also configure
+
+	-> Device Drivers
+		-> Input device support
+			-> Generic input layer (needed for keyboard, mouse, ...) (INPUT [=y])
+				-> Joysticks/Gamepads (INPUT_JOYSTICK [=y])
+					-> Xbox gamepad support (JOYSTICK_XPAD [=y])
+						-> Xbox gamepad rumble support (JOYSTICK_XPAD_FF [=y])
+
+      Save configuration and exit the kernel configuration tool, build the kernel and install both modules and kernel as described.
+
 If a USB game controller also integrates audio hardware, your Linux in the WSL instance possibly automatically activates its own audio server such as PipeWire (if installed) for handling the newly detected audio hardware, which cuts the connection to WSL's PulseAudio server, so that all audio output will be routed to the game controller's audio hardware instead of the host's Windows audio system. You might need to deactivate the guest Linux' own audio server in order to re-establish the use of WSL's PulseAudio server.
 
 In general, the X server integrated in WSL2 (WSLg) is special in certain aspects. Window size hints seem to be widely ignored by WSL's window manager. You might consider using GWSL (https://opticos.github.io/gwsl/) instead.
