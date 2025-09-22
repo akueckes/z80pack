@@ -119,7 +119,7 @@ or  Debian/Ubuntu:
 
 	sudo apt install build-essential flex bison dwarves libssl-dev libelf-dev cpio qemu-utils libncurses-dev
 
-I'd also recommend to create a backup of your current kernel which is found in Windows at /Users/<username>/vmlinux (just in case something goes wrong).
+I'd also recommend to create a backup of your current kernel which is found in Windows at /Users/\<username\>/vmlinux (just in case something goes wrong).
 
 Select
 	
