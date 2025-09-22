@@ -123,6 +123,7 @@ Then configure
     -> Input device support
         -> Generic input layer (needed for keyboard, mouse, ...) (INPUT [=y])
             -> Joystick interface (INPUT_JOYDEV [=y])
+
 -> Device Drivers
     -> Input device support
         -> Generic input layer (needed for keyboard, mouse, ...) (INPUT [=y])
