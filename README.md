@@ -120,7 +120,12 @@ There are, however, a couple of caveats. First, audio latency with WSL is signif
 
 For rebuilding the kernel, follow in general the instructions in https://github.com/microsoft/WSL2-Linux-Kernel.
 
-Don't forget to install first the required dependencies for Fedora
+First, get the WSL2 sources with
+
+	git clone https://github.com/microsoft/WSL2-Linux-Kernel.git
+	cd WSL2-Linux-Kernel
+
+Also don't forget to install the required dependencies for Fedora
 
 	sudo dnf group install development-tools
 	sudo dnf install cpio xz bc flex bison dwarves openssl-devel openssl-devel-engine ncurses-devel
