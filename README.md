@@ -253,7 +253,7 @@ If all that works, you should be done with the new kernel.
 
 ### Enabling SDL2 support for controllers
 
-In case you plan to use SDL2's controller support, you should use the SDL-JsTest for testing.
+In case you plan to use SDL2's controller support, you should use the SDL-JsTest program for testing.
 
 First install the necessary dependencies to build SDL-JsTest for Fedora:
 
@@ -289,7 +289,7 @@ If a joystick has been connected and properly attached to WSL, it should now be 
 
 	sudo ./sdl2-jstest --list
 
-If this now shows your controller hardware, you will need to create a udev rule for your controller, which  changes access rights automatically after each time you are connecting your joystick, so that SDL2 can use the joystick with normal user rights.
+If this now shows your controller hardware, you will need to create a udev rule for your controller, which changes access rights automatically after each time you are connecting your joystick, so that SDL2 can use the joystick with normal user rights.
 
 First you need to identify your controller's vendor id (VID) and product id (PID). You can derive both IDs with
 
@@ -309,6 +309,10 @@ where you have to replace aaaa by the vendor ID (VID) and bbbb by the product ID
 to activate the new rule. Disconnect, re-connect and re-attach the controller to trigger the rule. Again, try SDL-JsTest but without superuser rights:
 
 	./sdl2-jstest --list
+
+If there is some meaningful outout, you can test the joystick with a text GUI:
+
+	./sdl2-jstest --test 0
 
 Now your controller should be listed and ready for use with z80pack.
 
