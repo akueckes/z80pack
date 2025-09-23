@@ -209,7 +209,7 @@ Test the USB game controller by plugging in the controller, and listing the USB 
     
 	usbipd list
 
-Your controller should be listed with their bus ids. Try to bind and attach the controller to the WSL instance with
+Your controllers should be listed with their bus ids. Try to bind and attach the controller to the WSL instance with
     
 	usbipd bind --busid <bus-id>
 	usbipd attach --wsl --busid <bus-id>
