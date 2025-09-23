@@ -251,6 +251,67 @@ Also check whether there has been a device js* created for the joystick
    
 If all that works, you should be done with the new kernel.
 
+### Enabling SDL2 support for controllers
+
+In case you plan to use SDL2's controller support, you should use the SDL-JsTest for testing.
+
+First install the necessary dependencies to build SDL-JsTest for Fedora:
+
+	sudo dnf install cmake g++ SDL-devel ncurses-devel kernel-modules-extra
+
+or for Debian/Ubuntu:
+
+	sudo apt install cmake libsdl1.2-dev libsdl2-dev libncurses5-dev
+
+Get the SDL-JsTest sources
+
+	cd
+	git clone https://github.com/Grumbel/sdl-jstest.git
+
+Get the latest game controller database
+
+	cd sdl-jstest
+	git submodule init
+	git submodule update
+
+Build SDL-JsTest
+
+	mkdir build
+	cd build
+	cmake ..
+	make
+
+Test the newly built binary
+
+	./sdl2-jstest --list
+
+If a joystick has been connected and properly attached to WSL, it should now be listed. If you get a "No joysticks were found" message, try again as superuser
+
+	sudo ./sdl2-jstest --list
+
+If this now shows your controller hardware, you will need to create a udev rule for your controller, which  changes access rights automatically after each time you are connecting your joystick, so that SDL2 can use the joystick with normal user rights.
+
+First you need to identify your controller's vendor id (VID) and product id (PID). You can derive both IDs with
+
+	lsusb
+
+where the part before the colon is the VID and the part following the colon is the PID.
+
+Create a file /etc/udev/rules.d/99-joystick.rules with the following content:
+
+	# My Joystick(s)
+	KERNEL=="event*", ATTRS{idVendor}=="aaaa", ATTRS{idProduct}=="bbbb", MODE:="0644"
+
+where you have to replace aaaa by the vendor ID (VID) and bbbb by the product ID (PID) of your joystick. Add a new line for every joystick you want to use. Then run
+
+	sudo udevadm control --reload-rules
+
+to activate the new rule. Disconnect, re-connect and re-attach the controller to trigger the rule. Again, try SDL-JsTest but without superuser rights:
+
+	./sdl2-jstest --list
+
+Now your controller should be listed and ready for use with z80pack.
+
 ### Special notes
 
 If a USB game controller also integrates audio hardware, your Linux in the WSL instance possibly automatically activates its own audio server such as PipeWire (if installed) for handling the newly detected audio hardware, which cuts the connection to WSL's PulseAudio server, so that all audio output will be routed to the game controller's audio hardware instead of the host's Windows audio system. You might need to deactivate the guest Linux' own audio server in order to re-establish the use of WSL's PulseAudio server.
