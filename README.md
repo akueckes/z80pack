@@ -179,7 +179,11 @@ Example for XPad:
                 -> Xbox gamepad support (JOYSTICK_XPAD [=y])
                     -> Xbox gamepad rumble support (JOYSTICK_XPAD_FF [=y])
 
-Save the configuration and exit the kernel configuration tool, then build the new kernel as described by Microsoft. For installing the kernel modules I'd recommend not to follow Microsoft's procedure (creating & mounting a separate VHDX volume for the modules) but rather do it the simple way with
+Save the configuration and exit the kernel configuration tool, then build the new kernel as described by Microsoft with
+
+	make KCONFIG_CONFIG=Microsoft/config-wsl -j$(nproc)
+
+For installing the kernel modules I'd recommend not creating & mounting a separate VHDX volume for the modules) as described by Microsoft, but rather do it the simple way with
 
 	sudo make modules_install
 
