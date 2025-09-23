@@ -113,7 +113,7 @@ Test PortAudio with
 
 	bin/pa_devs
 
-This should list PulseAudio now as host API, which connects you to the Wondows audio subsystem.
+This should list PulseAudio now as host API, which connects you to the Windows audio subsystem.
 
 ### Controller support
 
