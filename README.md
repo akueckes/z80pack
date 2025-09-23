@@ -105,7 +105,7 @@ Now you can build the PortAudio package:
 	make
 	sudo make install
 
-Reboot to make the changes effective. The shared library will be placed at /usr/local/lib. It might be necessary to make the location known to your loader.
+The shared library will be placed at /usr/local/lib. It might be necessary to make the location known to your loader, e.g. by adding /usr/local/lib to /etc/ld.so.conf.
 
 ### Controller support
 
