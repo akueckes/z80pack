@@ -128,7 +128,7 @@ usbipd attach --wsl --busid <bus-id>
 ```
 Check with 'lsusb' in the WSL console, whether the device gets listed.
 
-There are, however, a couple of caveats. First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Second, the WSL Linux kernel probably will not be configured out-of-the-box for supporting game controllers. You might have to change the kernel configuration, rebuild the kernel and activate it for WSL.
+There are, however, a couple of caveats. First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Second, the WSL Linux kernel probably will not be configured out-of-the-box for supporting game controllers. You might have to change the kernel configuration, rebuild the kernel and activate it for WSL. If you plan to use SDL2 with z80pack, also perform the steps in section "Enabling SDL2 support for controllers" below. Overall, enabling audio and controller support with WSL is a bit tricky, but doable.
 
 ### Rebuilding the WSL2 kernel
 
@@ -295,14 +295,20 @@ First you need to identify your controller's vendor id (VID) and product id (PID
 
 	lsusb
 
-where the part before the colon is the VID and the part following the colon is the PID.
+which gives you an overview like
+
+	Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+	Bus 001 Device 003: ID 054c:09cc Sony Corp. DualShock 4 [CUH-ZCT2x]
+	Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+
+where the ID part before the colon is the VID and the part following the colon is the PID.
 
 Create a file /etc/udev/rules.d/99-joystick.rules with the following content:
 
 	# My Joystick(s)
-	KERNEL=="event*", ATTRS{idVendor}=="aaaa", ATTRS{idProduct}=="bbbb", MODE:="0644"
+	KERNEL=="event*", ATTRS{idVendor}=="054c", ATTRS{idProduct}=="09cc", MODE:="0644"
 
-where you have to replace aaaa by the vendor ID (VID) and bbbb by the product ID (PID) of your joystick. Add a new line for every joystick you want to use. Then run
+where you have to replace 054c by your controller's vendor ID (VID) and 09cc by the product ID (PID) of your controller. Add a new line for every controller you want to use. Then run
 
 	sudo udevadm control --reload-rules
 
@@ -310,11 +316,11 @@ to activate the new rule. Disconnect, re-connect and re-attach the controller to
 
 	./sdl2-jstest --list
 
-If there is some meaningful outout, you can test the joystick with a text GUI:
+If there is some meaningful outout, you can test the joystick device with a text GUI:
 
 	./sdl2-jstest --test 0
 
-Now your controller should be listed and ready for use with z80pack.
+Now your controller should be ready for use with z80pack.
 
 ### Special notes
 
