@@ -70,11 +70,6 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
 	- set **vector_graphic_hires_address** as an integer for the start address of the video buffer in memory
 	- set **vector_graphic_hires_fg** as a triple of R,G,B values each between 0 and 255 for the foreground color (simulates a monochrome CRT display color)
 
-
-Full documentation of the upstream project is at https://www.icl1900.co.uk/unix4fun/z80pack
-
-In addition to Udo Munk's instructions on Ubuntu, below are the steps to bild z80pack also on Fedora Linux based on this repo.
-
 ## PortAudio notes
 The PortAudio sound framework can be selected instead of SDL2 for emulation of devices which support audio (e.g. Cromemco D+7A and ADS Noisemaker emulation). First make sure the proper packages are installed (portaudio-devel for Fedora, and portaudio19-dev for Debian/Ubuntu). Then use 'WANT_PORTAUDIO=YES make' for building z80pack with support for the PortAudio framework. For using Windows Subsystem for Linux (WSL) there may be additional steps required (see WSL section below).
 
@@ -191,6 +186,10 @@ Save the configuration and exit the kernel configuration tool, build the kernel 
 If a USB game controller also integrates audio hardware, your Linux in the WSL instance possibly automatically activates its own audio server such as PipeWire (if installed) for handling the newly detected audio hardware, which cuts the connection to WSL's PulseAudio server, so that all audio output will be routed to the game controller's audio hardware instead of the host's Windows audio system. You might need to deactivate the guest Linux' own audio server in order to re-establish the use of WSL's PulseAudio server.
 
 In general, the X server integrated in WSL2 (WSLg) is special in certain aspects. Window size hints seem to be widely ignored by WSL's window manager. You might consider using GWSL (https://opticos.github.io/gwsl/) instead.
+
+Full documentation of the upstream project is at https://www.icl1900.co.uk/unix4fun/z80pack
+
+In addition to Udo Munk's instructions on Ubuntu, below are the steps to bild z80pack also on Fedora Linux based on this repo.
 
 ## Fedora
 ### Building
