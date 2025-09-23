@@ -183,6 +183,10 @@ Save the configuration and exit the kernel configuration tool, then build the ne
 
 	make KCONFIG_CONFIG=Microsoft/config-wsl -j$(nproc)
 
+This will take some time, in the meantime go out for a coffee...
+
+If the build fails, this is usually related to missing dependencies and/or mismatch with the used version of gcc. Install whatever is missing, and consider to add -std=gnu11 to the CFLAGS definitions in arch/x86/realmode/rm/Makefile and arch/x86/boot/Makefile.
+
 For installing the kernel modules I'd recommend not creating & mounting a separate VHDX volume for the modules) as described by Microsoft, but rather do it the simple way with
 
 	sudo make modules_install
@@ -191,11 +195,7 @@ When finished, copy the newly built vmlinux file to Windows with
 
 	cp vmlinux /mnt/c/Users/<username>/vmlinux-joystick
 
-This will take some time, in the meantime go out for a coffee...
-
-If the build fails, this is usually related to missing dependencies and/or mismatch with the used version of gcc. Install whatever is missing, and consider to add -std=gnu11 to the CFLAGS definitions in arch/x86/realmode/rm/Makefile and arch/x86/boot/Makefile.
-
-After a successful build, create a file /mnt/c/Users/&lt;username&gt;/.wsconfig with the content
+Create a file /mnt/c/Users/&lt;username&gt;/.wsconfig with the content
 
 	[wsl2]
 	kernel=C:\\Users\\<username>\\vmlinux-joystick
