@@ -248,7 +248,7 @@ In addition to Udo Munk's instructions on Ubuntu, below are the steps to bild z8
 1. Install the packages required for z80pack
 ```
 sudo dnf group install development-tools
-sudo dnf install mesa-libGL-devel libjpeg-devel libXrender-devel
+sudo dnf install mesa-libGL-devel libjpeg-devel libXrender-devel portaudio-devel
 ```
 For SDL2, also install
 ```
@@ -279,7 +279,7 @@ cd imsaisim
 ### Building
 First install the needed dependencies for X11:
 
-    sudo apt install build-essential libglu1-mesa-dev libjpeg9-dev libxrender-dev
+    sudo apt install build-essential libglu1-mesa-dev libjpeg9-dev libxrender-dev portaudio-dev
 
 or for SDL2:
 
