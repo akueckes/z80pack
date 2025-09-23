@@ -186,6 +186,8 @@ Example for XPad:
 
 Save the configuration and exit the kernel configuration tool, build the kernel and install modules and kernel as described.
 
+### Special notes
+
 If a USB game controller also integrates audio hardware, your Linux in the WSL instance possibly automatically activates its own audio server such as PipeWire (if installed) for handling the newly detected audio hardware, which cuts the connection to WSL's PulseAudio server, so that all audio output will be routed to the game controller's audio hardware instead of the host's Windows audio system. You might need to deactivate the guest Linux' own audio server in order to re-establish the use of WSL's PulseAudio server.
 
 In general, the X server integrated in WSL2 (WSLg) is special in certain aspects. Window size hints seem to be widely ignored by WSL's window manager. You might consider using GWSL (https://opticos.github.io/gwsl/) instead.
