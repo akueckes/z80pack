@@ -185,12 +185,12 @@ Save the configuration and exit the kernel configuration tool, then build the ne
 
 When finished, copy the newly built vmlinux file to Windows with
 
-	cp vmlinux /mnt/c/Users/&ls;username&gt;/vmlinux-joystick
+	cp vmlinux /mnt/c/Users/<username>/vmlinux-joystick
 
-Create a file /mnt/c/Users/&ls;username&gt;/.wsconfig with the content
+Create a file /mnt/c/Users/&lt;username&gt;/.wsconfig with the content
 
 [wsl2]
-kernel=C:\\Users\\&ls;username&gt;\\vmlinux-joystick
+kernel=C:\\Users\\&lt;username&gt;\\vmlinux-joystick
 
 Reboot the WSL instance with
 
