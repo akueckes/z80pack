@@ -195,7 +195,7 @@ This will take some time, in the meantime go out for a coffee...
 
 If the build fails, this is usually related to missing dependencies and/or mismatch with the used version of gcc. Install whatever is missing, and consider to add -std=gnu11 to the CFLAGS definitions in arch/x86/realmode/rm/Makefile and arch/x86/boot/Makefile.
 
-Create a file /mnt/c/Users/&lt;username&gt;/.wsconfig with the content
+After a successful build, create a file /mnt/c/Users/&lt;username&gt;/.wsconfig with the content
 
 	[wsl2]
 	kernel=C:\\Users\\<username>\\vmlinux-joystick
