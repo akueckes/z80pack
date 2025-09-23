@@ -279,7 +279,7 @@ cd imsaisim
 ### Building
 First install the needed dependencies for X11:
 
-    sudo apt install build-essential libglu1-mesa-dev libjpeg9-dev libxrender-dev portaudio-dev
+    sudo apt install build-essential libglu1-mesa-dev libjpeg9-dev libxrender-dev portaudio19-dev
 
 or for SDL2:
 
