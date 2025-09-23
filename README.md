@@ -157,6 +157,12 @@ Then configure
         -> Generic input layer (needed for keyboard, mouse, ...) (INPUT [=y])
             -> Event interface (INPUT_EVDEV [=y])
 
+For not having to load the USB/IP driver manually each time a controller is plugged in, configure
+
+-> Device Drivers
+    -> USB support (USB_SUPPORT [=y])
+        -> Support for Host-side USB (USB [=y])  
+
 -> Device Drivers
     -> USB support (USB_SUPPORT [=y])
         -> USB/IP support (USBIP_CORE [=y])
