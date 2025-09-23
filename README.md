@@ -179,7 +179,7 @@ Example for XPad:
                 -> Xbox gamepad support (JOYSTICK_XPAD [=y])
                     -> Xbox gamepad rumble support (JOYSTICK_XPAD_FF [=y])
 
-Save the configuration and exit the kernel configuration tool, then build the new kernel as described by Microsoft with
+Save the configuration and exit the kernel configuration tool, then build the new kernel:
 
 	make KCONFIG_CONFIG=Microsoft/config-wsl -j$(nproc)
 
