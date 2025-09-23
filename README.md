@@ -78,12 +78,14 @@ Since the later revisions, the use of z80pack under MS Windows is normally achie
 
 ### Rebuilding PortAudio
 
-If not already present, install the PulseAudio packages for Fedora
+Uninstall all already existing PortAudio packages. If not already present, install the PulseAudio packages for Fedora
 
+	sudo dnf remove portaudio-devel portaudio
 	sudo dnf install pulseaudio-libs-devel
 
 or for Debian/Ubuntu
 
+	sudo apt remove portaudio19-dev portaudio19 
 	sudo apt install libpulse-dev
 
 Then build the PortAudio library & software
@@ -106,6 +108,12 @@ Now you can build the PortAudio package:
 	sudo make install
 
 The shared library will be placed at /usr/local/lib. It might be necessary to make the location known to your loader, e.g. by adding /usr/local/lib to /etc/ld.so.conf.
+
+Test PortAudio with
+
+	bin/pa_devs
+
+This should list PulseAudio now as host API, which connects you to the Wondows audio subsystem.
 
 ### Controller support
 
