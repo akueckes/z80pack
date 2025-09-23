@@ -179,7 +179,50 @@ Example for XPad:
                 -> Xbox gamepad support (JOYSTICK_XPAD [=y])
                     -> Xbox gamepad rumble support (JOYSTICK_XPAD_FF [=y])
 
-Save the configuration and exit the kernel configuration tool, build the kernel and install modules and kernel as described.
+Save the configuration and exit the kernel configuration tool, then build the new kernel as described by Microsoft. For installing the kernel modules I'd recommend not to follow Microsoft's procedure (creating & mounting a separate VHDX volume for the modules) but rather do it the simple way with
+
+	sudo make modules_install
+
+When finished, copy the newly built vmlinux file to Windows with
+
+	cp vmlinux /mnt/c/Users/&ls;username&gt;/vmlinux-joystick
+
+Create a file /mnt/c/Users/&ls;username&gt;/.wsconfig with the content
+
+[wsl2]
+kernel=C:\\Users\\&ls;username&gt;\\vmlinux-joystick
+
+Reboot the WSL instance with
+
+	WSL --shutdown
+	WSL
+
+In WSL check the new kernel is really in use with
+
+ 	uname -a
+
+where your kernel name should include "-joystick".
+	
+Now with every start, WSL should use the new kernel, including support for game controllers.
+
+Test the USB game controller by plugging in the controller, and listing the USB devices on the Windows side in a command window with superuser privileges:
+    
+	usbipd list
+
+Your controller should be listed with their bus ids. Try to bind and attach the controller to the WSL instance with
+    
+	usbipd bind --busid <bus-id>
+	usbipd attach --wsl --busid <bus-id>
+    
+Check from the WSL command line whether the controller is active with
+    
+	lsusb
+    
+Also check whether there has been a device js* created for the joystick
+    
+	ls /dev/inputs/
+   
+If all that works, you should be done with the new kernel.
 
 ### Special notes
 
