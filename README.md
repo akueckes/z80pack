@@ -191,6 +191,10 @@ When finished, copy the newly built vmlinux file to Windows with
 
 	cp vmlinux /mnt/c/Users/<username>/vmlinux-joystick
 
+This will take some time, in the meantime go out for a coffee...
+
+If the build fails, this is usually related to missing dependencies.
+
 Create a file /mnt/c/Users/&lt;username&gt;/.wsconfig with the content
 
 	[wsl2]
