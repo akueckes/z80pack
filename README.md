@@ -168,7 +168,14 @@ For not having to load the USB/IP driver manually each time a controller is plug
         -> USB/IP support (USBIP_CORE [=y])
             -> VHCI hcd (USBIP_VHCI_HCD [=y])
 
-If you also need support for Microsoft XPad, also configure
+If you also need support for any special (non-generic) controller such as Microsoft XPad, also configure the appropriate driver in
+
+-> Device Drivers
+    -> Input device support
+        -> Generic input layer (needed for keyboard, mouse, ...) (INPUT [=y])
+            -> Joysticks/Gamepads (INPUT_JOYSTICK [=y])
+
+Example for XPad:
 
 -> Device Drivers
     -> Input device support
