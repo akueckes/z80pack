@@ -189,8 +189,8 @@ When finished, copy the newly built vmlinux file to Windows with
 
 Create a file /mnt/c/Users/&lt;username&gt;/.wsconfig with the content
 
-[wsl2]
-kernel=C:\\Users\\&lt;username&gt;\\vmlinux-joystick
+	[wsl2]
+	kernel=C:\\Users\\<username>\\vmlinux-joystick
 
 Reboot the WSL instance with
 
