@@ -79,21 +79,22 @@ Since the later revisions, the use of z80pack under MS Windows is normally achie
 ### Rebuilding PortAudio
 
 If not already present, install the PulseAudio packages for Fedora
-```
-sudo dnf install pulseaudio-libs-devel
-```
+	sudo dnf install pulseaudio-libs-devel
 or for Debian/Ubuntu
-```
-sudo apt install libpulse-dev
-```
+	sudo apt install libpulse-dev
 Then build the PortAudio library & software
-```
-git clone https://github.com/PortAudio/portaudio.git
-cd portaudio
-./configure --with-pulseaudio=yes --with-alsa=no --with-jack=no --with-sndio=no
-make
-sudo make install
-```
+	git clone https://github.com/PortAudio/portaudio.git
+	cd portaudio
+	./configure --with-pulseaudio=yes --with-alsa=no --with-jack=no --with-sndio=no
+PulseAudio now should be supported by your configuration. You should get an output like this:
+	AudioIO ..................... no
+	OSS ......................... yes
+	JACK ........................ no
+	PulseAudio .................. yes
+	Sndio ....................... no
+Now you can build the PortAudio package:
+	make
+	sudo make install
 Reboot to make the changes effective. The shared library will be placed at /usr/local/lib. It might be necessary to make the location known to your loader.
 
 ### Controller support
