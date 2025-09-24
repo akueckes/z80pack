@@ -317,7 +317,7 @@ to activate the new rule. Disconnect, re-connect and re-attach the controller to
 
 	./sdl2-jstest --list
 
-If there is some meaningful outout, you can test the joystick device with a text GUI:
+If there now is some meaningful output, you can test the joystick device with a text GUI:
 
 	./sdl2-jstest --test 0
 
