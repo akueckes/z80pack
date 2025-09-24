@@ -219,10 +219,12 @@ static void sdl_process_event(SDL_Event *event)
 		case SDL_JOYBUTTONDOWN:
 			switch(event->jdevice.which) {
 			case 0:
-				d7a_joystick_buttons &= ~(event->jbutton.button);
+				if (event->jbutton.button < 4)
+					d7a_joystick_buttons &= ~(1 << event->jbutton.button);
 				break;
 			case 1:
-				d7a_joystick_buttons &= ~(event->jbutton.button << 4);
+				if (event->jbutton.button < 4)
+					d7a_joystick_buttons &= ~(1 << (event->jbutton.button + 4));
 				break;
 			default:;
 			}	
@@ -230,10 +232,12 @@ static void sdl_process_event(SDL_Event *event)
 		case SDL_JOYBUTTONUP:
 			switch(event->jdevice.which) {
 			case 0:
-				d7a_joystick_buttons |= event->jbutton.button;
+				if (event->jbutton.button < 4)
+					d7a_joystick_buttons |= (1 << event->jbutton.button);
 				break;
 			case 1:
-				d7a_joystick_buttons |= event->jbutton.button << 4;
+				if (event->jbutton.button < 4)
+					d7a_joystick_buttons |= (1 << (event->jbutton.button + 4));
 				break;
 			default:;
 			}	
