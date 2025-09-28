@@ -122,7 +122,7 @@ This should list PulseAudio now as host API, which connects you to the Windows a
 
 ### Controller support
 
-WSL cannot pass through bluetooth controllers to Linux. The solution is using controllers with USB interface, which can be forwarded to WSL via USB/IP. For using these game controllers within WSL, you have to bind and attach the game controller with usbipd-win to the running WSL instance. Plug in your joystick, open a Windows command shell, and list the available USB devices with
+WSL cannot pass through bluetooth controllers to Linux. The solution is using controllers with USB interface, which can be forwarded to WSL via USB/IP. For using these game controllers within WSL, you have to bind and attach the game controller with usbipd-win to the running WSL instance (see https://github.com/dorssel/usbipd-win). Plug in your joystick, open a Windows command shell, and list the available USB devices with
 ```
 usbipd list
 ```
