@@ -112,25 +112,25 @@ void config(void)
 					LOGW(TAG, "invalid value for %s: %s", t1, t2);
 					break;
 				}
-			} else if (!strcmp(t1, "dazzler_line_sync")) {
+			} else if (!strcmp(t1, "dazzler_stats")) {
 				switch (*t2) {
 				case '0':
-					dazzler_line_sync = false;
+					dazzler_stats = false;
 					break;
 				case '1':
-					dazzler_line_sync = true;
+					dazzler_stats = true;
 					break;
 				default:
 					LOGW(TAG, "invalid value for %s: %s", t1, t2);
 					break;
 				}
-			} else if (!strcmp(t1, "dazzler_discrete_scale")) {
+			} else if (!strcmp(t1, "dazzler_frame_sync")) {
 				switch (*t2) {
 				case '0':
-					dazzler_discrete_scale = false;
+					dazzler_frame_sync = false;
 					break;
 				case '1':
-					dazzler_discrete_scale = true;
+					dazzler_frame_sync = true;
 					break;
 				default:
 					LOGW(TAG, "invalid value for %s: %s", t1, t2);

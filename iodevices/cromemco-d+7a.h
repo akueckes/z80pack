@@ -29,6 +29,17 @@ extern void cromemco_d7a_A5_out(BYTE data);
 extern void cromemco_d7a_A6_out(BYTE data);
 extern void cromemco_d7a_A7_out(BYTE data);
 
+extern unsigned long d7a_sample_rate;		/* default audio sample rate in Hz */
+extern unsigned long d7a_buffer_size;		/* default requested audio buffer size in samples per channel, defines audio delay */
+extern double d7a_sync_adjust;			/* default fine tuning for audio sync adjustment */
+extern char *d7a_soundfile;			/* filename of output WAV file if recording is requested */
+extern unsigned long d7a_recording_limit;	/* size of wave buffer for file output & debug purposes */
+extern bool d7a_stats;				/* output some stats */
+extern bool d7a_do_map_axis[2];			/* axis mapping requested */
+extern bool d7a_do_map_buttons[4];			/* button mapping requested */
+extern int d7a_axis_map[2][65];			/* game controller custom axis mapping */
+extern int d7a_button_map[2][65];		/* game controller custom button mapping */
+
 extern BYTE cromemco_d7a_D_in(void);
 extern BYTE cromemco_d7a_A1_in(void);
 extern BYTE cromemco_d7a_A2_in(void);
@@ -37,14 +48,5 @@ extern BYTE cromemco_d7a_A4_in(void);
 extern BYTE cromemco_d7a_A5_in(void);
 extern BYTE cromemco_d7a_A6_in(void);
 extern BYTE cromemco_d7a_A7_in(void);
-
-extern long d7a_sample_rate;
-extern long d7a_buffer_size;
-extern double d7a_sync_adjust;
-extern char *d7a_soundfile;
-extern long d7a_recording_limit;
-extern bool d7a_stats;
-extern int *d7a_axis_map;
-extern int *d7a_button_map;
 
 #endif /* !CROMEMCO_DPLUS7A_INC */

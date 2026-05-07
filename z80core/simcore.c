@@ -72,6 +72,10 @@ void init_cpu(void)
 		F |= N_FLAG;
 	}
 #endif
+
+#ifdef CPU_TIMER
+	init_cpu_timer();
+#endif
 }
 
 /*
@@ -380,3 +384,154 @@ void end_bus_request(void)
 	dma_bus_master = NULL;
 	bus_request = 0;
 }
+
+#ifdef CPU_TIMER
+typedef struct {
+	bool in_use;				/* true for used slots */
+	int priority;				/* priority (the timer with the lowest number is served first, 0=highest priority) */
+	Tstates_t value;			/* tick count when timer callback function will be called (0 = disarmed) */
+	void (*callback)(void *user_data);	/* function to be called if timer fires (NULL = no action) */
+	void *user_data;			/* pointer to user data (NULL = no user data) */
+} CPU_Timer;
+
+static CPU_Timer cpu_timer[MAX_CPU_TIMER];	/* the timer slots */
+static int cpu_timer_queue[MAX_CPU_TIMER];	/* an ordered list of the timers for prioritization */
+
+/*
+ *	Initialize all CPU timers
+ */
+void init_cpu_timer()
+{
+	for (int i=0; i<MAX_CPU_TIMER; i++) {
+		cpu_timer[i].in_use = false;
+		cpu_timer[i].priority = 0;
+		cpu_timer[i].value = 0;
+		cpu_timer[i].callback = NULL;
+		cpu_timer[i].user_data = NULL;
+
+		cpu_timer_queue[i] = -1;
+	}
+}
+
+/*
+ *	Allocate a free timer slot for use. Returns a timer ID in case of success,
+ *	or -1 otherwise.
+ */
+int register_cpu_timer(int priority, void (*callback)(void *user_data), void *user_data)
+{
+	int timer_id, i;
+
+	/* queue full? */
+	if (cpu_timer_queue[MAX_CPU_TIMER-1] >= 0) return -1;
+
+	/* assign next free slot */
+	for (timer_id=0; timer_id<MAX_CPU_TIMER; timer_id++) {
+		if (!cpu_timer[timer_id].in_use) {
+			cpu_timer[timer_id].in_use = true;
+			cpu_timer[timer_id].priority = priority;
+			cpu_timer[timer_id].value = 0;
+			cpu_timer[timer_id].callback = callback;
+			cpu_timer[timer_id].user_data = user_data;
+			break;
+		}
+	}
+	if (timer_id == MAX_CPU_TIMER) return -1;
+	
+	/* assign position in queue */
+	for (i=0; i<MAX_CPU_TIMER; i++) {
+		if (cpu_timer_queue[i] < 0) break;
+		if (priority < cpu_timer[cpu_timer_queue[i]].priority) {		
+			for (int j=MAX_CPU_TIMER-1; j>i; j--) {
+				cpu_timer_queue[j] = cpu_timer_queue[j-1];
+			}
+			break;
+		}
+	}
+	if (i == MAX_CPU_TIMER) return -1;
+	cpu_timer_queue[i] = timer_id;
+	
+	return timer_id;
+}
+
+/*
+ *	Free up a timer which is not used any more
+ */
+int unregister_cpu_timer(int timer_id)
+{
+	int i,j;
+
+	if ((timer_id < 0) || (timer_id >= MAX_CPU_TIMER)) return -1;
+	if (!cpu_timer[timer_id].in_use) return -1;
+
+	/* reset slot */
+	cpu_timer[timer_id].in_use = false;
+	cpu_timer[timer_id].value = 0;
+	cpu_timer[timer_id].callback = NULL;
+	cpu_timer[timer_id].user_data = NULL;
+
+	/* remove from queue */
+	for (i=0; i<MAX_CPU_TIMER; i++) {
+		if (cpu_timer_queue[i] == timer_id) {
+			for (j=i; j<MAX_CPU_TIMER-1; j++) {
+				cpu_timer_queue[j] = cpu_timer_queue[j+1];
+			}
+			cpu_timer_queue[j] = -1;
+			break;
+		}
+	}
+
+	return 0;
+}
+
+/*
+ *	Set when the timer shall trigger (in CPU ticks). A value of 0 stopps a timer.
+ */
+int set_cpu_timer(int timer_id, uint64_t cpu_ticks)
+{
+	if ((timer_id < 0) || (timer_id >= MAX_CPU_TIMER)) return -1;
+	if (!cpu_timer[timer_id].in_use) return -1;
+
+	cpu_timer[timer_id].value = cpu_ticks;
+
+	return 0;
+}
+
+/*
+ *	Return the current setting of a timer (in CPU ticks). A return value of 0
+ *	indicates the timer doesn't exist or is being stopped.
+ */
+uint64_t get_cpu_timer(int timer_id)
+{
+	if ((timer_id < 0) || (timer_id >= MAX_CPU_TIMER)) return 0;
+	if (!cpu_timer[timer_id].in_use) return 0;
+
+	return cpu_timer[timer_id].value;
+}
+
+/*
+ *	Return the ID of a timer from the prioritization queue
+ */
+int get_cpu_timer_id(int position)
+{
+	if ((position < 0) || (position >= MAX_CPU_TIMER)) return -1;
+	if (cpu_timer_queue[position] < 0) return -1;
+	if (!cpu_timer[cpu_timer_queue[position]].in_use) return -1;
+
+	return cpu_timer_queue[position];
+}
+
+/*
+ *	Set the callback function for the timer. Also sets the link of
+ *	the user data, which is handed over during the call when the
+ *	timer is triggered.
+ */
+void trigger_cpu_timer_callback(int timer_id)
+{
+	if ((timer_id < 0) || (timer_id >= MAX_CPU_TIMER)) return;
+	if (!cpu_timer[timer_id].in_use) return;
+
+	if (cpu_timer[timer_id].callback) {
+		cpu_timer[timer_id].callback(cpu_timer[timer_id].user_data);
+	}
+}
+#endif /* CPU_TIMER */

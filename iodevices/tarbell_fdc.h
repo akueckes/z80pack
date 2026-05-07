@@ -34,7 +34,17 @@
 extern BYTE tarbell_rom[32];
 extern bool tarbell_rom_enabled, tarbell_rom_active;
 
+#ifdef HAS_TARBELL_FDC
+#ifdef HAS_NETSERVER
+#include "netsrv.h"
+#endif
+
+extern char *disks[4];
+
+extern char *dsk_path(void);
+#else
 extern void dsk_path(void);
+#endif
 
 extern BYTE tarbell_stat_in(void), tarbell_track_in(void);
 extern BYTE tarbell_sec_in(void), tarbell_data_in(void);
@@ -43,5 +53,11 @@ extern void tarbell_cmd_out(BYTE data), tarbell_track_out(BYTE data);
 extern void tarbell_sec_out(BYTE data), tarbell_data_out(BYTE data);
 extern void tarbell_ext_out(BYTE data);
 extern void tarbell_reset(void);
+
+#ifdef HAS_TARBELL_FDC
+#ifdef HAS_NETSERVER
+extern void sendHardDisks(HttpdConnection_t *conn);
+#endif
+#endif
 
 #endif /* !TARBELL_FDC_INC */

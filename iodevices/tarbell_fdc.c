@@ -35,6 +35,12 @@
 #include "simdefs.h"
 #include "simglb.h"
 
+#ifdef HAS_TARBELL_FDC
+#include "diskmanager.h"
+#ifdef HAS_NETSERVER
+#include "netsrv.h"
+#endif
+#endif
 #include "tarbell_fdc.h"
 
 #include "log.h"
@@ -64,12 +70,16 @@ static BYTE buf[SEC_SZ];	/* buffer for one sector */
 static int stepdir = -1;	/* stepping direction */
 
 /* these are our disk drives */
+#ifdef HAS_TARBELL_FDC
+char *disks[4];
+#else
 static const char *disks[4] = {
 	"drivea.dsk",
 	"driveb.dsk",
 	"drivec.dsk",
 	"drived.dsk"
 };
+#endif
 
 /* bootstrap ROM */
 BYTE tarbell_rom[32] = {
@@ -85,7 +95,11 @@ bool tarbell_rom_active = true;	/* ROM is active at power on */
 /*
  * find and set path for disk images
  */
+#ifdef HAS_TARBELL_FDC
+char *dsk_path(void)
+#else
 void dsk_path(void)
+#endif
 {
 	struct stat sbuf;
 
@@ -100,7 +114,13 @@ void dsk_path(void)
 			/* nope, then DISKSDIR as set in Makefile */
 			strcpy(fn, DISKSDIR);
 		}
+#ifdef HAS_TARBELL_FDC
+		strncpy(diskd, fn, MAX_LFN);
 	}
+	return diskd;
+#else
+	}
+#endif
 }
 
 /*
@@ -503,4 +523,20 @@ void tarbell_reset(void)
 {
 	fdc_stat = fdc_track = fdc_sec = disk = state = dcnt = 0;
 	tarbell_rom_active = true;
+
+#ifdef HAS_TARBELL_FDC
+	readDiskmap(dsk_path());
+#endif
 }
+
+#ifdef HAS_TARBELL_FDC
+/*
+ *	dummy function
+ */
+#ifdef HAS_NETSERVER
+void sendHardDisks(HttpdConnection_t *conn)
+{
+	UNUSED(conn);
+}
+#endif
+#endif

@@ -15,7 +15,7 @@ MACHINE_SRCS = simcfg.c simio.c simmem.c simctl.c
 # machine specific I/O source files
 IO_SRCS = cromemco-dazzler.c proctec-vdm.c tarbell_fdc.c altair-88-dcdd.c \
 	altair-88-sio.c altair-88-2sio.c unix_terminal.c unix_network.c \
-	simbdos.c
+	simbdos.c fb_video.c
 
 # Installation directories by convention
 # http://www.gnu.org/prep/standards/html_node/Directory-Variables.html

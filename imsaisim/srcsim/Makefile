@@ -19,7 +19,7 @@ IO_SRCS = cromemco-dazzler.c cromemco-88ccc.c cromemco-d+7a.c diskmanager.c \
 	imsai-fif.c imsai-sio2.c imsai-hal.c imsai-vio.c unix_terminal.c \
 	unix_network.c netsrv.c generic-at-modem.c libtelnet.c rtc80.c \
 	simbdos.c am9511.c floatcnv.c ova.c \
-	ads-noisemaker.c vector-graphic-hires.c
+	fb_video.c audio.c joystick.c newtech-musicboard.c ads-noisemaker.c vector-graphic-hires.c # tarbell_fdc.c
 # machine specific libraries
 CIV_LIB = $(CIV_DIR)/libcivetweb.a
 CIV_LDLIBS = -lcivetweb
@@ -93,13 +93,13 @@ endif
 ifeq ($(TARGET_OS),BSD)
 PLAT_INCS = -I/usr/local/include
 PLAT_LDFLAGS = -L/usr/local/lib
-PLAT_LDLIBS = -lX11 -lXrender -l portaudio
+PLAT_LDLIBS = -lX11 -lXrender -lXext -l portaudio
 else ifeq ($(TARGET_OS),LINUX)
-PLAT_LDLIBS = -lX11 -lXrender -l portaudio
+PLAT_LDLIBS = -lX11 -lXrender -lXext -l portaudio
 else ifeq ($(TARGET_OS),OSX)
 PLAT_INCS = -I/opt/X11/include -I/opt/local/include -I/usr/local/include
 PLAT_LDFLAGS = -L/opt/X11/lib -L/usr/local/lib
-PLAT_LDLIBS = -lX11 -lXrender -l portaudio
+PLAT_LDLIBS = -lX11 -lXrender -lXext -l portaudio
 endif
 else
 ifeq ($(INFOPANEL),YES)
@@ -109,13 +109,13 @@ endif
 ifeq ($(TARGET_OS),BSD)
 PLAT_INCS = -I/usr/local/include
 PLAT_LDFLAGS = -L/usr/local/lib
-PLAT_LDLIBS = -lX11 -lXrender
+PLAT_LDLIBS = -lX11 -lXrender -lXext
 else ifeq ($(TARGET_OS),LINUX)
-PLAT_LDLIBS = -lX11 -lXrender
+PLAT_LDLIBS = -lX11 -lXrender -lXext
 else ifeq ($(TARGET_OS),OSX)
 PLAT_INCS = -I/opt/X11/include -I/opt/local/include -I/usr/local/include
 PLAT_LDFLAGS = -L/opt/X11/lib -L/usr/local/lib
-PLAT_LDLIBS = -lX11 -lXrender
+PLAT_LDLIBS = -lX11 -lXrender -lXext
 endif
 endif
 ###
@@ -165,8 +165,8 @@ endif
 
 # Debug - use `DEBUG=1 make build`
 ifneq ($(DEBUG),)
-COPTS = -O -g
-#-O0 -ggdb
+COPTS = -O0 -g
+#COPTS = -O0 -ggdb
 endif
 
 CFLAGS = $(CSTDS) $(COPTS) $(CWARNS)

@@ -39,9 +39,11 @@ typedef struct client {
 	bool is_new;
 	bool quit;
 	client_funcs_t *funcs;
+	client_funcs2_t *funcs2;
 } client_t;
 
 static client_t client[MAX_CLIENTS];
+static int handle_map[MAX_CLIENTS];
 static bool sim_finished;	/* simulator thread finished flag */
 
 int sdl_num_joysticks = 0;
@@ -54,7 +56,7 @@ int main(int argc, char *argv[])
 	uint64_t t1, t2;
 	int i, status;
 	args_t args = {argc, argv};
-
+	
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK) < 0) {
@@ -90,7 +92,10 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	for (i=0; i<MAX_CLIENTS; i++) client[i].in_use = false;
+	for (i=0; i<MAX_CLIENTS; i++) {
+		client[i].in_use = false;
+		handle_map[i] = -1;
+	}
 
 	tick = true;
 	t1 = SDL_GetTicks64() + 1000;
@@ -104,8 +109,14 @@ int main(int argc, char *argv[])
 			default:
 				/* event etc. */
 				for (i = 0; i < MAX_CLIENTS; i++)
-					if (client[i].in_use && client[i].funcs->event)
-						(*client[i].funcs->event)(&event);
+					if (client[i].in_use) {
+						if (handle_map[i] < 0) {
+							if (client[i].funcs->event) (*client[i].funcs->event)(&event);
+						}
+						else {
+							if (client[i].funcs2->event) (*client[i].funcs2->event)(handle_map[i], &event);
+						}
+					}
 			}
 		}
 
@@ -113,14 +124,30 @@ int main(int argc, char *argv[])
 		for (i = 0; i < MAX_CLIENTS; i++)
 			if (client[i].in_use) {
 				if (client[i].quit) {
-					if (client[i].funcs->close) (*client[i].funcs->close)();
+					if (handle_map[i] < 0) {				
+						if (client[i].funcs->close) (*client[i].funcs->close)();
+					}
+					else {
+						if (client[i].funcs2->close) (*client[i].funcs2->close)(handle_map[i]);
+					}
 					client[i].in_use = false;
+					handle_map[i] = -1;
 				} else {
 					if (client[i].is_new) {
-						if (client[i].funcs->open) (*client[i].funcs->open)();
+						if (handle_map[i] < 0) {				
+							if (client[i].funcs->open) (*client[i].funcs->open)();
+						}
+						else {
+							if (client[i].funcs2->open) (*client[i].funcs2->open)(handle_map[i]);
+						}
 						client[i].is_new = false;
 					}
-					if (client[i].funcs->draw) (*client[i].funcs->draw)(tick);
+					if (handle_map[i] < 0) {				
+						if (client[i].funcs->draw) (*client[i].funcs->draw)(tick);
+					}
+					else {
+						if (client[i].funcs2->draw) (*client[i].funcs2->draw)(handle_map[i], tick);
+					}
 				}
 			}
 
@@ -137,7 +164,12 @@ int main(int argc, char *argv[])
 
 	for (i = 0; i < MAX_CLIENTS; i++)
 		if (client[i].in_use) {
-			if (client[i].funcs->close) (*client[i].funcs->close)();
+			if (handle_map[i] < 0) {				
+				if (client[i].funcs->close) (*client[i].funcs->close)();
+			}
+			else {
+				if (client[i].funcs2->close) (*client[i].funcs2->close)(handle_map[i]);
+			}
 		}
 
 #ifdef FRONTPANEL
@@ -171,6 +203,29 @@ int simsdl_create(client_funcs_t *funcs)
 
 	return i;
 }
+
+int simsdl_create2(int handle, client_funcs2_t *funcs)
+{
+	int i;
+
+	for (i = 0; i < MAX_CLIENTS; i++)
+		if (!client[i].in_use) {
+			client[i].is_new = true;
+			client[i].quit = false;
+			client[i].funcs2 = funcs;
+			client[i].in_use = true;
+			handle_map[i] = handle;
+			break;
+		}
+
+	if (i == MAX_CLIENTS) {
+		fprintf(stderr, "No more client slots left\n");
+		i = -1;
+	}
+
+	return i;
+}
+
 
 /* this is called from the simulator thread */
 void simsdl_destroy(int i)

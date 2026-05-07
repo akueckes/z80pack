@@ -405,8 +405,10 @@ static int SystemHandler(HttpdConnection_t *conn, void *unused)
 		if (boot_switch[M_value])
 			httpdPrintf(conn, "\"Power-on jump address %04XH\", ",
 				    boot_switch[M_value]);
+#ifdef HAS_BANKED_ROM
 		if (R_flag)
 			httpdPrintf(conn, "\"%s\", ", BANKED_ROM_MSG);
+#endif
 
 		if (num_banks)
 			httpdPrintf(conn, "\"MMU has %d additional RAM banks of %d KB\",",

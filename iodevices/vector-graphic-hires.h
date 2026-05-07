@@ -11,7 +11,8 @@
  *
  * History:
  * 11-OCT-2024 first version
- *
+ * 19-APR-2026 added window scaling
+ * 03-MAY-2026 moved all non device specific code to fb_video.c
  */
 
 #ifndef VECTOR_GRAPHIC_HIRES_INC

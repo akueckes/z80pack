@@ -19,7 +19,15 @@ typedef struct client_funcs {
 	void (*draw)(bool tick);
 } client_funcs_t;
 
+typedef struct client_funcs2 {
+	void (*open)(int handle);
+	void (*close)(int handle);
+	void (*event)(int handle, SDL_Event *e);
+	void (*draw)(int handle, bool tick);
+} client_funcs2_t;
+
 extern int simsdl_create(client_funcs_t *funcs);
+extern int simsdl_create2(int handle, client_funcs2_t *funcs);
 extern void simsdl_destroy(int i);
 
 extern int sdl_num_joysticks;

@@ -48,7 +48,6 @@ uint64_t wait_time;		/* time spent waiting in time block */
 uint64_t total_io_time;		/* total time spent doing I/O */
 uint64_t total_wait_time;	/* total time spent waiting */
 
-
 #ifdef BUS_8080
 BYTE cpu_bus;			/* CPU bus status, for frontpanels */
 bool m1_step;			/* flag for waiting at M1 in single step */
