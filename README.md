@@ -15,7 +15,7 @@ There have been two reasons for the update.
 
 The first reason is related to the fact that the Cromemco Dazzler hardware is a quite interesting piece of history, which not just brought graphics capabilities to the Altair/Imsai world already in 1975, but also had been designed with some tweaking in mind, achieved with real-time programming the Dazzler registers (see the Dazzler patent for some more information). For this, the emulation has to improve timing accuracy in terms of being in sync with the CPU clock as much as possible. For some tweaks, also the implementation of the odd-even-line status flag is important, which actually is bound to the Dazzler's DMA cycles. The Dazzler started a development of different graphics solutions later from Cromemco itself, but also from Matrox or Vector Graphic, which experimented with different features. The Vector Graphic HiRes board follows a very similar approach as the Dazzler, but drops color support and rather offers its own 8 kByte video buffer mapped into the address space with double the graphics resolution of a Dazzler for monochrome displays.
 
-The second reason is that already in the early times of hobbyist computing, surprisingly complete setups had been developed, such as the Dazzler, D+7A/JS-1 and Cyclops from Cromemco, combining color graphics, human interfacing, sound/music and video digitalization all in one setup. It was an exciting time when much was experimented, and everything seemed possible. Although the main upstream project already uses SDL2 audio for playing a short sound when pressing the front panel switches, there is no implementation which lets you use the sound output already implemented by S100 boards of the time. Same applies to human interface devices other than the console keyboard (such as joysticks), which are not yet part of the original upstream project.
+The second reason is that already in the early times of hobbyist computing, surprisingly complete setups had been developed, such as the Dazzler, D+7A/JS-1 and Cyclops from Cromemco, combining color graphics, human interfacing, sound/music and video digitalization all in one setup. It was an exciting time when much was experimented, and everything seemed possible. Although Udo's original z80pack upstream project already uses SDL2 audio for playing a short sound when pressing the front panel switches, there is no implementation which lets you use the sound output implemented by S100 boards of the time. Same applies to human interface devices other than the console keyboard (such as joysticks), which are not yet part of the original upstream project.
 
 It was a twist of fate, that the early Cromemco products - although groundbreaking at their time, and paving the road for followers - were not long enough in the market to create a relevant number of applications which really made use of the potentials of the hardware. So the pile of original software for the hardware is limited. Fortunately, today we have a vivid demo scene, which aims for showing what might have been possible with the technology and the knowledge of the time. Which will need accurate emulations since the original hardware is becoming increasingly rare and sometimes expensive. In any case, those early products have been preparer for whatever came behind.
 
@@ -23,6 +23,7 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
 - machines cromemcosim and imsaisim are used as examples how to enable and pre-configure the new hardware emulations (see sim.h, simio.c, simcfg.c and system.conf files)
 - sound cards, joysticks and high resolution graphics currently operate in command line mode only, the z80pack web frontend is missing the appropriate Javascript support (library needs to be updated). Also, there is a bug in the Javascript library which affects the correct rendering of 4x4 (=monochrome) video mode for the Dazzler emulation.
 - be aware that implementations based on non-realtime multi-tasking OS like Windows or Linux will never achieve fully correct timing in emulations. The z80pack core implementation tries to provide in average a roughly correct CPU clock, but doesn't implement continuous timing accuracy.
+- If you need to run the emulation within Microsoft Windows, the Windows Subsystem for Linux (WSL) has a couple of advantages compared to the Cygwin approach of earlier z80pack versions. Since a full Linux is run in a container, we can use a genuine Linux distro of your choice and not just a Posix environment. Also there are significant performance improvements. Unfortunately, WSL offers limited support for audio, and no support at all for using game controllers. See below for how to configure your WSL environment for changing this on your own. It works out a bit tricky, but it works.
 - SDL2 under certain conditions seems to create noise with a phase directly related to the selected audio buffer size, probably when calling the audio callback function. Only seen with Ubuntu (libsdl2-2.0-0 version 2.30.0+dfsg-1ubuntu3.1), no fix yet.
 
 ## Notes on Cromemco Dazzler
@@ -74,7 +75,11 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
 The PortAudio sound framework can be selected instead of SDL2 for emulation of devices which support audio (e.g. Cromemco D+7A and ADS Noisemaker emulation). First make sure the proper packages are installed (portaudio-devel for Fedora, and portaudio19-dev for Debian/Ubuntu). Then use 'WANT_PORTAUDIO=YES make' for building z80pack with support for the PortAudio framework. For using Windows Subsystem for Linux (WSL) there may be additional steps required (see WSL section below).
 
 ## WSL notes
-Since the later revisions, the use of z80pack under MS Windows is normally achieved via WSL2. Since Windows 11, WSL passes audio via an intermediate PulseAudio server to the Windows audio system. With SDL2, this should not be a problem. For PortAudio, most ready-to-use PortAudio packages do NOT support PulseAudio out of the box, since PulseAudio has been replaced by ALSA + PipeWire in recent Linux distros. In that case you will get a "PortAudio: Could not open default stream" error message (among others, mostly ALSA errors). The solution is to re-build the PortAudio package with enabling PulseAudio support.
+Since the later revisions, the use of z80pack under MS Windows is normally achieved via WSL2. There are, however, a couple of caveats.
+
+First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Since Windows 11, WSL passes audio via an intermediate PulseAudio server to the Windows audio system. With SDL2, and except for the additional delay, this should not be much of a problem. For PortAudio, most ready-to-use PortAudio packages do NOT support PulseAudio out of the box, since PulseAudio has been replaced by ALSA + PipeWire in recent Linux distros. In that case you will get a "PortAudio: Could not open default stream" error message (among others, mostly ALSA errors). The solution is to re-build the PortAudio package with enabling PulseAudio support.
+
+Second, the WSL Linux kernel probably will not be configured out-of-the-box for supporting game controllers. You might have to change the kernel configuration, rebuild the kernel and activate it for WSL. If you plan to use SDL2 with z80pack, also perform the steps in section "Enabling SDL2 support for controllers" below. Overall, enabling audio and controller support with WSL is a bit tricky, but doable.
 
 ### Rebuilding PortAudio
 
@@ -117,7 +122,7 @@ This should list PulseAudio now as host API, which connects you to the Windows a
 
 ### Controller support
 
-WSL cannot pass through bluetooth controllers to Linux. For using USB game controllers within WSL, you have to bind and attach the game controller with usbipd-win to the running WSL instance. Plug in your joystick, open a Windows command shell, and list the available USB devices with
+WSL cannot pass through bluetooth controllers to Linux. The solution is using controllers with USB interface, which can be forwarded to WSL via USB/IP. For using these game controllers within WSL, you have to bind and attach the game controller with usbipd-win to the running WSL instance (see https://github.com/dorssel/usbipd-win). Plug in your joystick, open a Windows command shell, and list the available USB devices with
 ```
 usbipd list
 ```
@@ -127,8 +132,6 @@ usbipd bind --busid <bus-id>
 usbipd attach --wsl --busid <bus-id>
 ```
 Check with 'lsusb' in the WSL console, whether the device gets listed.
-
-There are, however, a couple of caveats. First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Second, the WSL Linux kernel probably will not be configured out-of-the-box for supporting game controllers. You might have to change the kernel configuration, rebuild the kernel and activate it for WSL. If you plan to use SDL2 with z80pack, also perform the steps in section "Enabling SDL2 support for controllers" below. Overall, enabling audio and controller support with WSL is a bit tricky, but doable.
 
 ### Rebuilding the WSL2 kernel
 
@@ -206,7 +209,7 @@ This will take some time, in the meantime go out for a coffee...
 
 If the build fails, this is usually related to missing dependencies and/or mismatch with the used version of gcc. Install whatever is missing, and consider to add -std=gnu11 to the CFLAGS definitions in arch/x86/realmode/rm/Makefile and arch/x86/boot/Makefile.
 
-For installing the kernel modules I'd recommend not creating & mounting a separate VHDX volume for the modules) as described by Microsoft, but rather do it the simple way with
+For installing the kernel modules I'd recommend not creating & mounting a separate VHDX volume for the modules as described by Microsoft, but rather do it the simple way with
 
 	sudo make modules_install
 
@@ -316,7 +319,7 @@ to activate the new rule. Disconnect, re-connect and re-attach the controller to
 
 	./sdl2-jstest --list
 
-If there is some meaningful outout, you can test the joystick device with a text GUI:
+If there now is some meaningful output, you can test the joystick device with a text GUI:
 
 	./sdl2-jstest --test 0
 
