@@ -5,15 +5,18 @@ z80pack is a mature emulator of multiple platforms with 8080 and Z80 CPU.
 This fork adds a couple of features to Udo Munk's original upstream project:
 - support for S100 sound cards with SDL2 and PortAudio sound frameworks (currently used by Cromemco D+7A and ADS Noisemaker emulation)
 - joystick support (Cromemco D+7A/JS-1) with common game controllers
+- added CPU timer functionality for accurate synchonization of CPU emulation and device emulation
 - more accurate Cromemco Dazzler emulation (performance rendering, interlaced display, line status flag, window resize etc.)
 - support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board)
 - Cromemco Dazzler and D+7A boards now can be individually selected via separate build switches
 - bugfix for Cromemco Cyclops emulation
-- more general structure for SDL2 clients (can also be windowless)
+- more general structure for SDL2 clients (can also be windowless like joysticks)
 
 There have been two reasons for the update.
 
 The first reason is related to the fact that the Cromemco Dazzler hardware is a quite interesting piece of history, which not just brought graphics capabilities to the Altair/Imsai world already in 1975, but also had been designed with some tweaking in mind, achieved with real-time programming the Dazzler registers (see the Dazzler patent for some more information). For this, the emulation has to improve timing accuracy in terms of being in sync with the CPU clock as much as possible. For some tweaks, also the implementation of the odd-even-line status flag is important, which actually is bound to the Dazzler's DMA cycles. The Dazzler started a development of different graphics solutions later from Cromemco itself, but also from Matrox or Vector Graphic, which experimented with different features. The Vector Graphic HiRes board follows a very similar approach as the Dazzler, but drops color support and rather offers its own 8 kByte video buffer mapped into the address space with double the graphics resolution of a Dazzler for monochrome displays.
+
+Udo Monk's original implementation won't allow precise synchronization between the CPU emulation and state machines implementing I/O devices. So I have added a CPU timer capability, which allows to set timers which are bound to CPU execution, similar to the atto timers used in MAME. Synchronization is now possible on single CPU execution level. Also, video rendering is now de-coupled from the video device state machines, eliminating the dependency between rendering performance and device emulation.
 
 The second reason is that already in the early times of hobbyist computing, surprisingly complete setups had been developed, such as the Dazzler, D+7A/JS-1 and Cyclops from Cromemco, combining color graphics, human interfacing, sound/music and video digitalization all in one setup. It was an exciting time when much was experimented, and everything seemed possible. Although Udo's original z80pack upstream project already uses SDL2 audio for playing a short sound when pressing the front panel switches, there is no implementation which lets you use the sound output implemented by S100 boards of the time. Same applies to human interface devices other than the console keyboard (such as joysticks), which are not yet part of the original upstream project.
 
@@ -30,8 +33,8 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
 - define HAS_DAZZLER in the appropriate sim.h file to enable this emulation
 - additional config settings in the system.conf file:
 	- set **dazzler_interlaced** to 1 to enable interlaced display for the Dazzler
-	- set **dazzler_line_sync** to 1 for enabling the odd-even-line status flag
-	- set **dazzler_discrete_scale** to 1 if you prefer window sizing with full multiples of the pixel count
+	- set **dazzler_frame_sync** to 1 to avoide frame tearing during the verical scan period
+	- set **dazzler_stats** to 1 to enable some statistics output
 
 ## Notes on Cromemco D+7A
 - define HAS_D7A in the appropriate sim.h file to enable this emulation
