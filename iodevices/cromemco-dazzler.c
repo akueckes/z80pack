@@ -259,7 +259,7 @@ static const char *TAG = "DAZZLER";
 
 /* parameters configurable in system.conf */
 bool dazzler_stats = false;		/* collect & output some statistics */
-bool dazzler_frame_sync = true;		/* wait for end of scan period for changing display by default */
+bool dazzler_frame_sync = false;	/* wait for end of scan period for changing display by default */
 bool dazzler_interlaced = false;	/* non-interlaced display by default */
 
 /* Dazzler stuff */

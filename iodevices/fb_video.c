@@ -96,7 +96,7 @@
 /* SDL rendering options */
 #define SURFACE	(0)			/* fastest rendering option */
 #define TEXTURE (1)			/* still fast, and can scale freely */
-#define SDL_RENDER_MODE TEXTURE		/* define to either SURFACE or TEXTURE */
+#define SDL_RENDER_MODE SURFACE		/* define to either SURFACE or TEXTURE */
 #define BUSMASTER			/* define to simulate busmaster operation for Dazzler DMA */
 
 #include <stdio.h>
@@ -146,6 +146,8 @@ typedef struct _fbvideo {
 	int vscan_period;
 	int vblank_period;
 	int timer_id;
+	Tstates_t T_end_vscan;
+	Tstates_t T_end_vblank;
 
 	/* system.conf properties */
 	bool stats;
@@ -189,6 +191,7 @@ typedef struct _fbvideo {
 	SDL_Texture *texture;
 	Uint32 *canvas;
 	Uint32 fg;
+	int pitch;
 #endif /* RENDER_MODE */
 
 #else /* !WANT_SDL */
@@ -300,11 +303,13 @@ static void open_window(int device_handle)
 				  SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 	dev->renderer = SDL_CreateRenderer(dev->window, -1,
 				(SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
-	dev->canvas = malloc(width * height * 4);
 	dev->texture = SDL_CreateTexture(dev->renderer,
                                    SDL_PIXELFORMAT_RGBA8888,
                                    SDL_TEXTUREACCESS_STREAMING,
                                    width, height);
+	int pitch;
+	SDL_LockTexture(dev->texture, NULL, (void **)&dev->canvas, &pitch);
+	dev->pitch = pitch/4;
 #endif /* SDL_RENDER_MODE */
 
 #ifdef CPU_TIMER
@@ -338,8 +343,6 @@ static void close_window(int device_handle)
 	dev->renderer = NULL;
 	SDL_DestroyTexture(dev->texture);
 	dev->texture = NULL;
-	if (dev->canvas) free(dev->canvas);
-	dev->canvas = NULL;
 #endif
 	SDL_DestroyWindow(dev->window);
 	dev->window = NULL;
@@ -705,7 +708,7 @@ inline void fill_rect(int device_handle, int x, int y, int w, int h)
 #if SDL_RENDER_MODE == SURFACE
         		dev->canvas[(j * dev->surface->w) + i] = dev->fg;
 #elif SDL_RENDER_MODE == TEXTURE
-        		dev->canvas[(j * dev->canvas_width) + i] = dev->fg;
+        		dev->canvas[(j * dev->pitch) + i] = dev->fg;
 #endif /* RENDER_MODE*/
         	}
         }
@@ -912,6 +915,10 @@ static void ws_refresh(int device_handle)
 #ifdef WANT_SDL
 /*
  *	Update the display with SDL framework (called in a loop by main thread)
+ *
+ *	Note: Every call to this routine is done strictly in sequence, so multiple
+ *            devices get served one after the other and should not block each other
+ *	      (e.g. by using too long sleep functions).
  */
 static void update_display(int device_handle, bool tick)
 {
@@ -920,16 +927,6 @@ static void update_display(int device_handle, bool tick)
 	if (device_handle < 0) return;
 
 	FBVideo *dev = &fb_video_devices[device_handle];
-
-	Tstates_t T_end;
-	struct timespec min_sleep_time = { 0, 1 };
-
-#if SDL_RENDER_MODE == TEXTURE
-	int pitch, i;
-	Uint32 *pixels;
-#endif /* RENDER_MODE */
-
-	T_end = T + (dev->vscan_period * f_value);
 
 	/* handling window resize event */
 	if (dev->window_resized) {
@@ -951,6 +948,18 @@ static void update_display(int device_handle, bool tick)
 		}
 	}
 
+	/* frame timing if not done in callback function */
+	if (!dev->callback) {
+		if (T < dev->T_end_vscan) return;
+		if (T < dev->T_end_vblank) {
+			dev->vblank = true;
+			return;
+		}
+		dev->vblank = false;
+		dev->T_end_vscan = T + (f_value * dev->vscan_period);
+		dev->T_end_vblank = dev->T_end_vscan + (f_value * dev->vblank_period);
+	}
+
 	if (dev->state) {
 		if (dev->interlaced)
 			dev->field = (dev->field == ODD) ? EVEN : ODD;
@@ -961,30 +970,13 @@ static void update_display(int device_handle, bool tick)
 #if SDL_RENDER_MODE == SURFACE
 		SDL_UpdateWindowSurface(dev->window);
 #elif SDL_RENDER_MODE == TEXTURE
-		SDL_LockTexture(dev->texture, NULL, (void **)&pixels, &pitch);
-		pitch /= 4;
-		for (i=0; i<dev->canvas_height; i++) {
-			memcpy(&pixels[i * pitch], &dev->canvas[i * dev->canvas_width], dev->canvas_width * 4);
-		}
 		SDL_UnlockTexture(dev->texture);
 		SDL_RenderCopy(dev->renderer, dev->texture, NULL, NULL);
 		SDL_RenderPresent(dev->renderer);
+		int pitch;
+		SDL_LockTexture(dev->texture, NULL, (void **)&dev->canvas, &pitch);
+		dev->pitch = pitch/4;
 #endif /* SDL_RENDER_MODE */
-
-#ifdef HAS_NETSERVER
-		if (!dev->callback || n_flag) {
-#else
-		if (!dev->callback) {
-#endif
-			/* in case we are done earlier with the frame, let's do a short nap */
-			while ((T < T_end) && (cpu_state == ST_CONTIN_RUN)) nanosleep(&min_sleep_time, NULL);
-	
-			/* frame done, pause during vertical blank */
-			dev->vblank = true;
-			T_end = T + (f_value * dev->vblank_period);
-			while ((T < T_end) && (cpu_state == ST_CONTIN_RUN)) nanosleep(&min_sleep_time, NULL);
-			dev->vblank = false;
-		}
 
 		dev->frames++;
 	}
@@ -1015,10 +1007,8 @@ static void *update_thread(void *arg)
 	/* can be cancelled all the time */
 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 
-	Tstates_t T_end;
-	struct timespec min_sleep_time = { 0, 1 };
-	
 	while (true) {	/* do forever or until cancelled */
+
 #ifdef HAS_NETSERVER
 		if (!n_flag) {
 #endif /* HAS_NETSERVER */
@@ -1054,12 +1044,25 @@ static void *update_thread(void *arg)
 				/* sync with vertical blank */
 				if (dev->state && (!dev->vblank)) continue;
 			}
-
-			T_end = T + (dev->vscan_period * f_value);
 #endif /* !WANT_SDL */
 #ifdef HAS_NETSERVER
 		}
+		if (!dev->callback || n_flag) {
+#else
+		if (!dev->callback) {
 #endif /* HAS_NETSERVER */
+			if (T < dev->T_end_vscan) {
+				sleep_for_us((dev->T_end_vscan - T) / f_value);
+			}
+			if (T < dev->T_end_vblank) {
+				dev->vblank = true;
+				sleep_for_us((dev->T_end_vblank - T) / f_value);
+			}
+			dev->vblank = false;
+			dev->T_end_vscan = T + (f_value * dev->vscan_period);
+			dev->T_end_vblank = dev->T_end_vscan + (f_value * dev->vblank_period);
+		}
+
 		if (dev->state) {
 #ifdef HAS_NETSERVER
 			if (!n_flag) {
@@ -1091,11 +1094,6 @@ static void *update_thread(void *arg)
 					}
 				}
 				XUnlockDisplay(display);
-
-				if (!dev->callback) {
-					/* in case we are done earlier with the frame, let's do a short nap */
-					while ((T < T_end) && (cpu_state == ST_CONTIN_RUN)) nanosleep(&min_sleep_time, NULL);			
-				}
 #endif /* !WANT_SDL */
 #ifdef HAS_NETSERVER
 			} else {
@@ -1105,19 +1103,6 @@ static void *update_thread(void *arg)
 		}
 		else {
 			sleep_for_us(dev->vscan_period);
-		}
-
-
-#ifdef HAS_NETSERVER
-		if (!dev->callback || n_flag) {
-#else
-		if (!dev->callback) {
-#endif
-			/* frame done, pause for vertical blank */
-			dev->vblank = true;
-			T_end = T + (f_value * dev->vblank_period);
-			while ((T < T_end) && (cpu_state == ST_CONTIN_RUN)) nanosleep(&min_sleep_time, NULL);
-			dev->vblank = false;
 		}
 	}
 
@@ -1190,6 +1175,8 @@ int fb_video_init(
 #endif
 
 	/* other initilizations */
+	dev->T_end_vscan = 0;
+	dev->T_end_vblank = 0;
 	dev->vblank = false;
 	dev->field = FULL;
 	dev->window_resized = false;
