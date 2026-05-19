@@ -264,9 +264,8 @@ static void open_window(int device_handle)
                                    SDL_PIXELFORMAT_RGBA8888,
                                    SDL_TEXTUREACCESS_STREAMING,
                                    width, height);
-	int pitch;
-	SDL_LockTexture(dev->texture, NULL, (void **)&dev->canvas, &pitch);
-	dev->pitch = pitch/4;
+	SDL_LockTexture(dev->texture, NULL, (void **)&dev->canvas, &dev->pitch);
+	dev->pitch /= 4;
 #endif /* SDL_RENDER_MODE */
 
 #ifdef CPU_TIMER
@@ -958,8 +957,6 @@ static void update_display(int device_handle, bool tick)
 		SDL_UnlockTexture(dev->texture);
 		SDL_RenderCopy(dev->renderer, dev->texture, NULL, NULL);
 		SDL_RenderPresent(dev->renderer);
-		SDL_LockTexture(dev->texture, NULL, (void **)&dev->canvas, &dev->pitch);
-		dev->pitch /= 4;
 #endif /* SDL_RENDER_MODE */
 
 		dev->frames++;

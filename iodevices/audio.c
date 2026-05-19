@@ -504,7 +504,6 @@ void audio_record(int device_handle, int c, char data)
 
     /* if required, re-sync with audio stream */
     if (target < buffer->frame_count) {
-    	printf("\rresync\n");
     	if (device->sync_adjust == 0.0)
     		buffer->sync_adjust = (double)(get_clock_us() - buffer->start_time) / (current_ticks - buffer->start_ticks) * f_value;
     	buffer->frame_offset = buffer->frame_count - target + device->buffer_size;
