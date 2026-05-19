@@ -7,7 +7,7 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - joystick support (Cromemco D+7A/JS-1) with common game controllers
 - added CPU timer functionality for accurate synchronization of CPU emulation and device emulation
 - more accurate Cromemco Dazzler emulation (performance rendering, interlaced display, line status flag, window resize etc.)
-- support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board)
+- support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board) and the versatile CompuPro Spectrum graphics card, utilitizing an advanced MC6847 Video Display Generator chip
 - Cromemco Dazzler and D+7A boards now can be individually selected via separate build switches
 - bugfix for Cromemco Cyclops emulation
 - more general structure for SDL2 clients (can also be windowless like joysticks)
@@ -24,19 +24,19 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
 
 ## General notes/limitations:
 - machines cromemcosim and imsaisim are used as examples how to enable and pre-configure the new hardware emulations (see sim.h, simio.c, simcfg.c and system.conf files)
-- sound cards, joysticks and high resolution graphics currently operate in command line mode only, the z80pack web frontend is missing the appropriate Javascript support (library needs to be updated). Also, there is a bug in the Javascript library which affects the correct rendering of 4x4 (=monochrome) video mode for the Dazzler emulation.
+- sound cards, joysticks and new graphics hardware emulations currently operate in command line mode only, the z80pack web frontend is missing the appropriate Javascript support (library needs to be updated). Also, there is a bug in the Javascript library which affects the correct rendering of 4x4 (=monochrome) video mode for the Dazzler emulation.
 - If you need to run the emulation within Microsoft Windows, the Windows Subsystem for Linux (WSL) has a couple of advantages compared to the Cygwin approach of earlier z80pack versions. Since a full Linux is run in a container, we can use a genuine Linux distro of your choice and not just a Posix environment. Also there are significant performance improvements. Unfortunately, WSL offers limited support for audio, and no support at all for using game controllers. See below for how to configure your WSL environment for changing this on your own. It works out a bit tricky, but it works.
 - SDL2 under certain conditions seems to create noise with a phase directly related to the selected audio buffer size, probably when calling the audio callback function. Only seen with Ubuntu (libsdl2-2.0-0 version 2.30.0+dfsg-1ubuntu3.1), no fix yet.
 
 ## Notes on Cromemco Dazzler
-- define HAS_DAZZLER in the appropriate sim.h file to enable this emulation
+- define HAS_DAZZLER in the appropriate sim.h file to enable this emulation during build
 - additional config settings in the system.conf file:
 	- set **dazzler_interlaced** to 1 to enable interlaced display for the Dazzler
 	- set **dazzler_frame_sync** to 1 to avoide frame tearing during the verical scan period
 	- set **dazzler_stats** to 1 to enable some statistics output
 
 ## Notes on Cromemco D+7A
-- define HAS_D7A in the appropriate sim.h file to enable this emulation
+- define HAS_D7A in the appropriate sim.h file to enable this emulation during build
 - the D+7A now supports both audio playback and joystick inputs
 - can be configured to produce a WAV file as recording of an audio sequence
 - build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
@@ -56,7 +56,7 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
  - some game controllers come with an integrated audio device, be aware that audio output might be routed to this device when being plugged in (no sound on all other devices). You might think about disabling the game controller's audio device.
 
 ## Notes on ADS Noisemaker
-- define HAS_NOISEMAKER in the appropriate sim.h file to enable this emulation
+- define HAS_NOISEMAKER in the appropriate sim.h file to enable this emulation during build
 - uses two AY-3-8910 programmed sound generators for stereo synthesis with 6 independent tone channels and 2 noise channels
 - can record a certain amount of playback into a user selected WAV file
 - build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
@@ -67,11 +67,21 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
 	- set **noisemaker_recording_limit** as an integer for the maximum number of samples to limit the size of a recording
 
 ## Notes on Vector Graphic HiRes Graphics
-- define HAS_VECTOR_GRAPHIC_HIRES in the appropriate sim.h file to enable this emulation
+- define HAS_VECTOR_GRAPHIC_HIRES in the appropriate sim.h file to enable this emulation during build
 - additional config settings in the system.conf file:
-	- set **vector_graphic_hires_mode** for the graphic mode either to "bilevel" or "halftone"
+	- set **vector_graphic_hires_mode** for the graphic mode either to "bilevel" or "gradient"
 	- set **vector_graphic_hires_address** as an integer for the start address of the video buffer in memory
 	- set **vector_graphic_hires_fg** as a triple of R,G,B values each between 0 and 255 for the foreground color (simulates a monochrome CRT display color)
+
+## Notes on CompuPro Spectrum
+- define HAS_COMPUPRO_SPECTRUM in the appropriate sim.h file to enable this emulation during build
+- additional config settings in the system.conf file:
+	- set **spectrum_address** as an integer for the start address of the video buffer in memory
+	- set **spectrum_interlaced** to 1 to enable interlaced display for the Spectrum
+	- set **spectrum_frame_sync** to 1 to synchronize screen updates to vertical blank
+	- set **spectrum_border** to 1 to show the screen border around the active area
+	- set **spectrum_artifacts** to 1 to visualize NTSC artifacts in hires mode
+	- set **spectrum_stats** to 1 to enable statistics output
 
 ## PortAudio notes
 The PortAudio sound framework can be selected instead of SDL2 for emulation of devices which support audio (e.g. Cromemco D+7A and ADS Noisemaker emulation). First make sure the proper packages are installed (portaudio-devel for Fedora, and portaudio19-dev for Debian/Ubuntu). Then use 'WANT_PORTAUDIO=YES make' for building z80pack with support for the PortAudio framework. For using Windows Subsystem for Linux (WSL) there may be additional steps required (see WSL section below).
