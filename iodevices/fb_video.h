@@ -26,8 +26,6 @@ extern int fb_video_init(
 	int width,			/* video width in pixel */
 	int height,			/* video height in pixel */
 	const char *title,		/* title of video window */
-	uint8_t (*colormap)[3],		/* custom color map (optional) */
-	uint8_t (*gradientmap)[3],	/* custom gradient map (optional) */
 	bool stats,			/* enable statistics */
 	bool frame_sync,		/* perform changes only during vertical blank period */
 	bool interlaced,		/* enable interlaced display */
@@ -46,6 +44,7 @@ extern void fb_video_hide(int device_handle);
 extern void fb_video_off(int device_handle);
 extern void set_fg_color(int device_handle, int i);
 extern void set_fg_gradient(int device_handle, int i);
-extern void fill_rect(int device_handle, int x, int y, int w, int h);
+extern void fill_rect(int device_handle, int x, int y, int w, int h, uint8_t (*fg)[3]);
+extern void draw_pattern(int device_handle, int x, int y, int psize, uint8_t data, uint8_t (*fg)[3], uint8_t (*bg)[3]);
 
 #endif /* !FB_VIDEO_INC */

@@ -70,6 +70,10 @@
 #include "vector-graphic-hires.h"
 #endif
 
+#ifdef HAS_COMPUPRO_SPECTRUM
+#include "compupro-spectrum.h"
+#endif
+
 #ifdef HAS_TARBELL_FDC
 #include "tarbell_fdc.h"
 #endif
@@ -472,6 +476,70 @@ void config(void)
 				vector_graphic_hires_fg_color[0] = v1;
 				vector_graphic_hires_fg_color[1] = v2;
 				vector_graphic_hires_fg_color[2] = v3;
+#endif
+#ifdef HAS_COMPUPRO_SPECTRUM
+			} else if (!strcmp(t1, "spectrum_address")) {
+				spectrum_address = strtol(t2, NULL, 0);
+			} else if (!strcmp(t1, "spectrum_interlaced")) {
+				switch (*t2) {
+				case '0':
+					spectrum_interlaced = false;
+					break;
+				case '1':
+					spectrum_interlaced = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+			} else if (!strcmp(t1, "spectrum_frame_sync")) {
+				switch (*t2) {
+				case '0':
+					spectrum_frame_sync = false;
+					break;
+				case '1':
+					spectrum_frame_sync = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+			} else if (!strcmp(t1, "spectrum_border")) {
+				switch (*t2) {
+				case '0':
+					spectrum_border = false;
+					break;
+				case '1':
+					spectrum_border = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+			} else if (!strcmp(t1, "spectrum_artifacts")) {
+				switch (*t2) {
+				case '0':
+					spectrum_artifacts = false;
+					break;
+				case '1':
+					spectrum_artifacts = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+			} else if (!strcmp(t1, "spectrum_stats")) {
+				switch (*t2) {
+				case '0':
+					spectrum_stats = false;
+					break;
+				case '1':
+					spectrum_stats = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
 #endif
 #ifdef HAS_TARBELL_FDC
 			} else if (!strcmp(t1, "tarbell_rom_enabled")) {

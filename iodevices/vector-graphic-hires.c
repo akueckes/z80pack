@@ -48,8 +48,8 @@ uint8_t vector_graphic_hires_fg_color[3] = {0, 255, 0};
 #define HSIZE 512
 #define VSIZE 480
 
-uint8_t colors[2][3];
-uint8_t gradients[16][3];
+static uint8_t hires_colors[2][3];
+static uint8_t hires_gradients[16][3];
 
 static int frames = 0;
 static uint64_t start_time;
@@ -91,6 +91,7 @@ static void draw_frame()
 	int current_row;		/* current row within datablock */
 	int num_rows;			/* rows of current pixel resolution */
 	int rows_per_datablock;		/* vertical coverage of a datablock */
+	uint8_t (*fg)[3];
 	
 	/* make sure everything is initialized */
 	if (fb_video_device < 0) return;
@@ -103,13 +104,13 @@ static void draw_frame()
 		psize = 2;
 		rows_per_datablock = 2;
 		num_rows = 240;
-		set_fg_color(fb_video_device, 1);
+		fg = &hires_colors[1];
 	}
 	else {
 		psize = 4;
 		rows_per_datablock = 1;
 		num_rows = 120;
-		set_fg_gradient(fb_video_device, 15);
+		fg = &hires_gradients[15];
 	}
 
 	/* now draw the frame */
@@ -125,23 +126,23 @@ static void draw_frame()
 				if (row % 2 == 0) {
 					/* first subrow */
 					if (i & 0x80)
-						fill_rect(fb_video_device, bytepos * 4 * psize, row * 2, psize, 2);
+						fill_rect(fb_video_device, bytepos * 4 * psize, row * 2, psize, 2, fg);
 					if (i & 0x40)
-						fill_rect(fb_video_device, (bytepos * 4 + 1) * psize, row * 2, psize, 2);
+						fill_rect(fb_video_device, (bytepos * 4 + 1) * psize, row * 2, psize, 2, fg);
 					if (i & 0x08)
-						fill_rect(fb_video_device, (bytepos * 4 + 2) * psize, row * 2, psize, 2);
+						fill_rect(fb_video_device, (bytepos * 4 + 2) * psize, row * 2, psize, 2, fg);
 					if (i & 0x04)
-						fill_rect(fb_video_device, (bytepos * 4 + 3) * psize, row * 2, psize, 2);
+						fill_rect(fb_video_device, (bytepos * 4 + 3) * psize, row * 2, psize, 2, fg);
 				} else {
 					/* second subrow */
 					if (i & 0x20)
-						fill_rect(fb_video_device, bytepos * 4 * psize, row * 2, psize, 2);
+						fill_rect(fb_video_device, bytepos * 4 * psize, row * 2, psize, 2, fg);
 					if (i & 0x10)
-						fill_rect(fb_video_device, (bytepos * 4 + 1) * psize, row * 2, psize, 2);
+						fill_rect(fb_video_device, (bytepos * 4 + 1) * psize, row * 2, psize, 2, fg);
 					if (i & 0x02)
-						fill_rect(fb_video_device, (bytepos * 4 + 2) * psize, row * 2, psize, 2);
+						fill_rect(fb_video_device, (bytepos * 4 + 2) * psize, row * 2, psize, 2, fg);
 					if (i & 0x01)
-						fill_rect(fb_video_device, (bytepos * 4 + 3) * psize, row * 2, psize, 2);
+						fill_rect(fb_video_device, (bytepos * 4 + 3) * psize, row * 2, psize, 2, fg);
 				}
 			}
 			else {	/* nibble mode */
@@ -149,15 +150,13 @@ static void draw_frame()
 				i = (data & 0xf0) >> 4;
 
 				/* gradient */
-				set_fg_gradient(fb_video_device, i);
-				fill_rect(fb_video_device, bytepos * 2 * psize, row * psize, psize * 2, psize);			
+				fill_rect(fb_video_device, bytepos * 2 * psize, row * psize, psize * 2, psize, &hires_gradients[i]);			
 
 				/* second pixel */
 				i = data & 0x0f;
 
 				/* gradient */
-				set_fg_gradient(fb_video_device, i);
-				fill_rect(fb_video_device, (bytepos * 2 + 1) * psize, row * psize, psize * 2, psize);				
+				fill_rect(fb_video_device, (bytepos * 2 + 1) * psize, row * psize, psize * 2, psize, &hires_gradients[i]);
 			}
 		}
 
@@ -184,18 +183,18 @@ void vector_graphic_hires_init()
 	g = vector_graphic_hires_fg_color[1] / 255.0;
 	b = vector_graphic_hires_fg_color[2] / 255.0;
 	for (i=0; i<16; i++) {
-		gradients[i][0] = (uint8_t) i*0x11*r;
-		gradients[i][1] = (uint8_t) i*0x11*g;
-		gradients[i][2] = (uint8_t) i*0x11*b;
+		hires_gradients[i][0] = (uint8_t) i*0x11*r;
+		hires_gradients[i][1] = (uint8_t) i*0x11*g;
+		hires_gradients[i][2] = (uint8_t) i*0x11*b;
 	}
-	colors[1][0] = r * 255; 
-	colors[1][1] = g * 255; 
-	colors[1][2] = b * 255; 
+	hires_colors[1][0] = r * 255; 
+	hires_colors[1][1] = g * 255; 
+	hires_colors[1][2] = b * 255; 
 
 	frames = 0;
 	start_time = get_clock_us();
 
-	fb_video_device = fb_video_init(HSIZE, VSIZE, "Vecor Graphic HiRes", colors, gradients,
+	fb_video_device = fb_video_init(HSIZE, VSIZE, "Vecor Graphic HiRes",
 		0, 0, 0, 15174, 1460, NULL, &draw_frame, NULL, NULL, NULL, NULL, NULL);
 }
 

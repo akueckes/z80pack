@@ -86,6 +86,9 @@
 #ifdef HAS_VECTOR_GRAPHIC_HIRES
 #include "vector-graphic-hires.h"
 #endif
+#ifdef HAS_COMPUPRO_SPECTRUM
+#include "compupro-spectrum.h"
+#endif
 #ifdef HAS_MODEM
 #include "generic-at-modem.h"
 #endif
@@ -197,6 +200,9 @@ in_func_t *const port_in[256] = {
 	[ 64] = mmu_in,			/* MMU */
 	[ 65] = clkc_in,		/* RTC command */
 	[ 66] = clkd_in,		/* RTC data */
+#ifdef HAS_COMPUPRO_SPECTRUM
+	[144] = compupro_spectrum_in,	/* ComproPro Spectrum status */
+#endif
 	[160] = hwctl_in,		/* virtual hardware control */
 #ifdef HAS_APU
 	[162] = apu_data_in,
@@ -289,6 +295,9 @@ out_func_t *const port_out[256] = {
 	[ 64] = mmu_out,		/* MMU */
 	[ 65] = clkc_out,		/* RTC command */
 	[ 66] = clkd_out,		/* RTC data */
+#ifdef HAS_COMPUPRO_SPECTRUM
+	[144] = compupro_spectrum_out,	/* ComproPro Spectrum control */
+#endif
 	[160] = hwctl_out,		/* virtual hardware control */
 	[161] = host_bdos_out,		/* host file I/O hook */
 #ifdef HAS_APU
@@ -350,6 +359,9 @@ void init_io(void)
 #ifdef HAS_VECTOR_GRAPHIC_HIRES
 	vector_graphic_hires_init();
 #endif
+#ifdef HAS_COMPUPRO_SPECTRUM
+	compupro_spectrum_init();
+#endif
 #ifdef HAS_MODEM
 	modem_device_init();
 #endif
@@ -395,6 +407,9 @@ void exit_io(void)
 #endif
 #ifdef HAS_VECTOR_GRAPHIC_HIRES
 	vector_graphic_hires_off();
+#endif
+#ifdef HAS_COMPUPRO_SPECTRUM
+	compupro_spectrum_off();
 #endif
 	/* shutdown VIO */
 	imsai_vio_off();

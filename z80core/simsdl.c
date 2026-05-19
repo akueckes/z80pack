@@ -48,6 +48,15 @@ static bool sim_finished;	/* simulator thread finished flag */
 
 int sdl_num_joysticks = 0;
 
+#include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_mixer.h>
+
+/* Global or localized audio pointers for context */
+Mix_Music *myMusic = NULL;
+
 int main(int argc, char *argv[])
 {
 	SDL_Event event;
@@ -100,6 +109,8 @@ int main(int argc, char *argv[])
 	tick = true;
 	t1 = SDL_GetTicks64() + 1000;
 	while (!quit) {
+		if (sim_finished) quit = true;
+
 		/* process event queue */
 		while (SDL_PollEvent(&event) != 0) {
 			switch(event.type) {
@@ -155,9 +166,6 @@ int main(int argc, char *argv[])
 		t2 = SDL_GetTicks64();
 		if ((tick = (t2 >= t1)))
 			t1 = t2 + 1000;
-
-		if (sim_finished)
-			quit = true;
 	}
 
 	SDL_WaitThread(sim_thread, &status);

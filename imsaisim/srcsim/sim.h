@@ -59,7 +59,8 @@
 //#define HAS_D7A	        /* has simulated I/O for Cromemco D+7A */
 //#define HAS_MUSICBOARD  /* has simulated I/O for Newtech Model 6 Music Board */
 //#define HAS_NOISEMAKER	/* has simulated I/O for ADS Noisemaker */
-#define HAS_VECTOR_GRAPHIC_HIRES	/* has has simulated I/O for Vector Graphic High Resolution board */
+//#define HAS_VECTOR_GRAPHIC_HIRES	/* has has simulated I/O for Vector Graphic High Resolution board */
+#define HAS_COMPUPRO_SPECTRUM	/* has has simulated I/O for CompuPro Spectrum board */
 //#define HAS_TARBELL_FDC	/* has Tarbell SD floppy disk controller */
 #define CPU_TIMER
 

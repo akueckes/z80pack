@@ -59,8 +59,8 @@
 	  12 scanlines/pixel for low resolution nibble mode, 32x32
 	  6 scanlines/pixel for medium resolution nibble mode, 64x64
 	  3 scanlines/pixel for high resolution x4 mode, 128x128
-	  384 scanlines per frame
-	  192 scanlines per field (interlaced)
+	  384 scanlines per frame (active area)
+	  192 scanlines per field (active area, interlaced)
 	  16 or 32 memory locations per line, depending on the video mode
 	
 	How the Dazzler works
@@ -283,6 +283,44 @@ static bool *vblank;
 static int *field;
 static int *timer_id;
 
+static uint8_t dazzler_colors[16][3] = {
+	{ 0x00, 0x00, 0x00 },
+	{ 0x80, 0x00, 0x00 },
+	{ 0x00, 0x80, 0x00 },
+	{ 0x80, 0x80, 0x00 },
+	{ 0x00, 0x00, 0x80 },
+	{ 0x80, 0x00, 0x80 },
+	{ 0x00, 0x80, 0x80 },
+	{ 0x80, 0x80, 0x80 },
+	{ 0x00, 0x00, 0x00 },
+	{ 0xFF, 0x00, 0x00 },
+	{ 0x00, 0xFF, 0x00 },
+	{ 0xFF, 0xFF, 0x00 },
+	{ 0x00, 0x00, 0xFF },
+	{ 0xFF, 0x00, 0xFF },
+	{ 0x00, 0xFF, 0xFF },
+	{ 0xFF, 0xFF, 0xFF }
+};
+static uint8_t dazzler_gradients[16][3] = {
+	{ 0x00, 0x00, 0x00 },
+	{ 0x11, 0x11, 0x11 },
+	{ 0x22, 0x22, 0x22 },
+	{ 0x33, 0x33, 0x33 },
+	{ 0x44, 0x44, 0x44 },
+	{ 0x55, 0x55, 0x55 },
+	{ 0x66, 0x66, 0x66 },
+	{ 0x77, 0x77, 0x77 },
+	{ 0x88, 0x88, 0x88 },
+	{ 0x99, 0x99, 0x99 },
+	{ 0xAA, 0xAA, 0xAA },
+	{ 0xBB, 0xBB, 0xBB },
+	{ 0xCC, 0xCC, 0xCC },
+	{ 0xDD, 0xDD, 0xDD },
+	{ 0xEE, 0xEE, 0xEE },
+	{ 0xFF, 0xFF, 0xFF }
+};
+
+
 /*
  *	Switch DAZZLER off from front panel or window termination
  */
@@ -351,11 +389,12 @@ static void draw_scanline(BYTE format, int num_bytes, int hires_subrow, int vpos
 {
 	int bytepos;
 	uint8_t i;
+	uint8_t (*fg)[3];
 
 	/* select foreground color for x4 mode */
 	if (format & 0x40) {
-		if (format & 0x10) set_fg_color(fb_video_device, format & 0x0f);
-		else set_fg_gradient(fb_video_device, format & 0x0f);
+		if (format & 0x10) fg = &dazzler_colors[format & 0x0f];
+		else fg = &dazzler_gradients[format & 0x0f];
 	}
 
 	for (bytepos=0; bytepos<num_bytes; bytepos++) {
@@ -366,23 +405,23 @@ static void draw_scanline(BYTE format, int num_bytes, int hires_subrow, int vpos
 			if (hires_subrow == 0) {
 				/* first 3 scanline subrow */
 				if (i & 0x01)
-					fill_rect(fb_video_device, bytepos * 4 * psize, vpos, psize, 1);
+					fill_rect(fb_video_device, bytepos * 4 * psize, vpos, psize, 1, fg);
 				if (i & 0x02)
-					fill_rect(fb_video_device, (bytepos * 4 + 1) * psize, vpos, psize, 1);
+					fill_rect(fb_video_device, (bytepos * 4 + 1) * psize, vpos, psize, 1, fg);
 				if (i & 0x10)
-					fill_rect(fb_video_device, (bytepos * 4 + 2) * psize, vpos, psize, 1);
+					fill_rect(fb_video_device, (bytepos * 4 + 2) * psize, vpos, psize, 1, fg);
 				if (i & 0x20)
-					fill_rect(fb_video_device, (bytepos * 4 + 3) * psize, vpos, psize, 1);
+					fill_rect(fb_video_device, (bytepos * 4 + 3) * psize, vpos, psize, 1, fg);
 			} else {
 				/* second 3 scanline subrow */
 				if (i & 0x04)
-					fill_rect(fb_video_device, bytepos * 4 * psize, vpos, psize, 1);
+					fill_rect(fb_video_device, bytepos * 4 * psize, vpos, psize, 1, fg);
 				if (i & 0x08)
-					fill_rect(fb_video_device, (bytepos * 4 + 1) * psize, vpos, psize, 1);
+					fill_rect(fb_video_device, (bytepos * 4 + 1) * psize, vpos, psize, 1, fg);
 				if (i & 0x40)
-					fill_rect(fb_video_device, (bytepos * 4 + 2) * psize, vpos, psize, 1);
+					fill_rect(fb_video_device, (bytepos * 4 + 2) * psize, vpos, psize, 1, fg);
 				if (i & 0x80)
-					fill_rect(fb_video_device, (bytepos * 4 + 3) * psize, vpos, psize, 1);
+					fill_rect(fb_video_device, (bytepos * 4 + 3) * psize, vpos, psize, 1, fg);
 			}
 		}
 		else {	/* nibble mode */
@@ -390,22 +429,20 @@ static void draw_scanline(BYTE format, int num_bytes, int hires_subrow, int vpos
 			/* first pixel */
 			i = line_buffer[bytepos] & 0x0f;
 			if (format & 0x10) {
-				set_fg_color(fb_video_device, i);	/* color */
+				fill_rect(fb_video_device, bytepos * 2 * psize, vpos, psize, 1, &dazzler_colors[i]);
 			}
 			else {
-				set_fg_gradient(fb_video_device, i);	/* grayscale */
+				fill_rect(fb_video_device, bytepos * 2 * psize, vpos, psize, 1, &dazzler_gradients[i]);
 			}
-			fill_rect(fb_video_device, bytepos * 2 * psize, vpos, psize, 1);
 
 			/* second pixel */
 			i = (line_buffer[bytepos] & 0xf0) >> 4;
 			if (format & 0x10) {
-				set_fg_color(fb_video_device, i);	/* color */
+				fill_rect(fb_video_device, (bytepos * 2 + 1) * psize, vpos, psize, 1, &dazzler_colors[i]);
 			}
 			else {
-				set_fg_gradient(fb_video_device, i);	/* grayscale */
+				fill_rect(fb_video_device, (bytepos * 2 + 1) * psize, vpos, psize, 1, &dazzler_gradients[i]);
 			}
-			fill_rect(fb_video_device, (bytepos * 2 + 1) * psize, vpos, psize, 1);
 		}
 	}
 }
@@ -435,8 +472,7 @@ static void draw_line_buffer(Dazzler_registers *dazzler, int num_lines, int num_
 			    ((*field == EVEN) && (dazzler->scanline % 2 == 0))) {
 			    	if (dazzler->format & 0x40) {
 					/* erase scanline */
-					set_fg_color(fb_video_device, 0);
-					fill_rect(fb_video_device, 0, vpos, width, 1);
+					fill_rect(fb_video_device, 0, vpos, width, 1, &dazzler_colors[0]);
 				}
 
 			    	/* draw scanline */
@@ -444,15 +480,13 @@ static void draw_line_buffer(Dazzler_registers *dazzler, int num_lines, int num_
 			}
 			else {
 				/* erase scanline */
-				set_fg_color(fb_video_device, 0);
-				fill_rect(fb_video_device, 0, vpos, width, 1);
+				fill_rect(fb_video_device, 0, vpos, width, 1, &dazzler_colors[0]);
 			}
 		}
 		else {
 		    	if (dazzler->format & 0x40) {
 				/* erase scanline */
-				set_fg_color(fb_video_device, 0);
-				fill_rect(fb_video_device, 0, vpos, width, 1);
+				fill_rect(fb_video_device, 0, vpos, width, 1, &dazzler_colors[0]);
 			}
 			draw_scanline(dazzler->format, num_bytes, hires_subrow, vpos, psize);
 		}
@@ -674,12 +708,12 @@ void cromemco_dazzler_ctl_out(BYTE data)
 		if (fb_video_device >= 0) fb_video_show(fb_video_device);
 		else {
 #ifdef CPU_TIMER
-			fb_video_device = fb_video_init(HSIZE, VSIZE, "Cromemco DAzzLER", NULL, NULL,
+			fb_video_device = fb_video_init(HSIZE, VSIZE, "Cromemco DAzzLER",
 				dazzler_stats, dazzler_frame_sync, dazzler_interlaced, 12129, 4000,
 				&ws_update, NULL, &cromemco_dazzler_timer_callback, &dazzler,
 				&vblank, &field, &timer_id);
 #else
-			fb_video_device = fb_video_init(HSIZE, VSIZE, "Cromemco DAzzLER", NULL, NULL,
+			fb_video_device = fb_video_init(HSIZE, VSIZE, "Cromemco DAzzLER",
 				dazzler_stats, dazzler_frame_sync, dazzler_interlaced, 12129, 4000,
 				&ws_update, &draw_field, NULL, NULL, &vblank, &field, &timer_id);
 #endif

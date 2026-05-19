@@ -96,7 +96,7 @@
 /* SDL rendering options */
 #define SURFACE	(0)			/* fastest rendering option */
 #define TEXTURE (1)			/* still fast, and can scale freely */
-#define SDL_RENDER_MODE SURFACE		/* define to either SURFACE or TEXTURE */
+#define SDL_RENDER_MODE TEXTURE		/* define to either SURFACE or TEXTURE */
 #define BUSMASTER			/* define to simulate busmaster operation for Dazzler DMA */
 
 #include <stdio.h>
@@ -162,10 +162,6 @@ typedef struct _fbvideo {
 	bool window_resized;
 	const char *title;
 
-	/* colormaps */
-	uint8_t (*colors)[3];
-	uint8_t (*gradients)[3];
-
 	/* stats data */
 	int frames;
 	uint64_t start_time;
@@ -218,46 +214,6 @@ typedef struct _fbvideo {
 #endif
 } FBVideo;
 
-/* standard color palette */
-static uint8_t standard_colors[16][3] = {
-	{ 0x00, 0x00, 0x00 },
-	{ 0x80, 0x00, 0x00 },
-	{ 0x00, 0x80, 0x00 },
-	{ 0x80, 0x80, 0x00 },
-	{ 0x00, 0x00, 0x80 },
-	{ 0x80, 0x00, 0x80 },
-	{ 0x00, 0x80, 0x80 },
-	{ 0x80, 0x80, 0x80 },
-	{ 0x00, 0x00, 0x00 },
-	{ 0xFF, 0x00, 0x00 },
-	{ 0x00, 0xFF, 0x00 },
-	{ 0xFF, 0xFF, 0x00 },
-	{ 0x00, 0x00, 0xFF },
-	{ 0xFF, 0x00, 0xFF },
-	{ 0x00, 0xFF, 0xFF },
-	{ 0xFF, 0xFF, 0xFF }
-};
-
-/* standard halftone palette */
-static uint8_t standard_gradients[16][3] = {
-	{ 0x00, 0x00, 0x00 },
-	{ 0x11, 0x11, 0x11 },
-	{ 0x22, 0x22, 0x22 },
-	{ 0x33, 0x33, 0x33 },
-	{ 0x44, 0x44, 0x44 },
-	{ 0x55, 0x55, 0x55 },
-	{ 0x66, 0x66, 0x66 },
-	{ 0x77, 0x77, 0x77 },
-	{ 0x88, 0x88, 0x88 },
-	{ 0x99, 0x99, 0x99 },
-	{ 0xAA, 0xAA, 0xAA },
-	{ 0xBB, 0xBB, 0xBB },
-	{ 0xCC, 0xCC, 0xCC },
-	{ 0xDD, 0xDD, 0xDD },
-	{ 0xEE, 0xEE, 0xEE },
-	{ 0xFF, 0xFF, 0xFF }
-};
-
 #ifdef HAS_NETSERVER
 static void ws_clear(int device_handle);
 #endif
@@ -301,6 +257,7 @@ static void open_window(int device_handle)
 				  SDL_WINDOWPOS_UNDEFINED,
 				  width, height,
 				  SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+	// SDL_SetWindowAspectRatio() needs SDL3
 	dev->renderer = SDL_CreateRenderer(dev->window, -1,
 				(SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
 	dev->texture = SDL_CreateTexture(dev->renderer,
@@ -398,20 +355,19 @@ static void open_window(int device_handle)
 	XSelectInput(display, dev->window, StructureNotifyMask | PropertyChangeMask);
 
 	dev->gc = XCreateGC(display, dev->window, 0, NULL);
-	XSetFillStyle(display, dev->gc, FillSolid);
-	dev->pixmap = XCreatePixmap(display, dev->rootwindow, width, height, dev->wa.depth);
 	
 	/* Create an XImage structure that points to our buffer */
     	XMatchVisualInfo(display, screen, 24, TrueColor, &dev->vinfo);
     	dev->canvas = malloc(width * height * 4);
         dev->ximage = XCreateImage(display, dev->vinfo.visual, 24, ZPixmap, 0, (char *)dev->canvas,
                                   width, height, 32, 0);
-
 #if 1
 	/* XRenderExtension stuff */
     	if (has_xrender_extension) {
 		dev->pict_format = XRenderFindVisualFormat(display, DefaultVisual(display, screen));
 		dev->window_pic = XRenderCreatePicture(display, dev->window, dev->pict_format, 0, NULL);
+		dev->pixmap = XCreatePixmap(display, dev->window, width, height, dev->wa.depth);
+		dev->canvas_pic = XRenderCreatePicture(display, dev->pixmap, dev->pict_format, 0, NULL);
 		dev->transform.matrix[0][0] = XDoubleToFixed(1);
 		dev->transform.matrix[0][1] = XDoubleToFixed(0);
 		dev->transform.matrix[0][2] = XDoubleToFixed(0);
@@ -430,10 +386,10 @@ static void open_window(int device_handle)
 	size_hints->min_height = height;
 	size_hints->base_width = width;
 	size_hints->base_height = height;
-	size_hints->min_aspect.x = 1;
-	size_hints->min_aspect.y = 1;
-	size_hints->max_aspect.x = 1;
-	size_hints->max_aspect.y = 1;
+	size_hints->min_aspect.x = width;
+	size_hints->min_aspect.y = height;
+	size_hints->max_aspect.x = width;
+	size_hints->max_aspect.y = height;
 
 	XSetWMNormalHints(display, dev->window, size_hints);
 	XFree(size_hints);
@@ -470,7 +426,9 @@ static void close_window(int device_handle)
 	if (dev->scaled_ximage) {
 		XDestroyImage(dev->scaled_ximage);
 	}
-	XFreePixmap(display, dev->pixmap);
+	if (has_xrender_extension) {
+		XFreePixmap(display, dev->pixmap);
+	}
 	XFreeGC(display, dev->gc);
 	XDestroyWindow(display, dev->window);
 	XUnlockDisplay(display);
@@ -653,41 +611,9 @@ static void process_event(int device_handle, SDL_Event *event)
 }
 
 /*
- *	Set foreground color for SDL
- */
-inline void set_fg_color(int device_handle, int i)
-{
-	if (device_handle < 0) return;
-	
-	FBVideo *dev = &fb_video_devices[device_handle];
-
-#if SDL_RENDER_MODE == SURFACE
-	dev->fg = SDL_MapRGB(dev->surface->format, *dev->colors[i], *(dev->colors[i]+1), *(dev->colors[i]+2));
-#elif SDL_RENDER_MODE == TEXTURE
-	dev->fg = *dev->colors[i] << 24 | *(dev->colors[i]+1) << 16 | *(dev->colors[i]+2) << 8 | 0xff;
-#endif /* SDL_RENDER_MODE */
-}
-
-/*
- *	Set foreground gradient value for SDL
- */
-inline void set_fg_gradient(int device_handle, int i)
-{
-	if (device_handle < 0) return;
-
-	FBVideo *dev = &fb_video_devices[device_handle];
-	
-#if SDL_RENDER_MODE == SURFACE
-	dev->fg = SDL_MapRGB(dev->surface->format, *dev->gradients[i], *(dev->gradients[i]+1), *(dev->gradients[i]+2));
-#elif SDL_RENDER_MODE == TEXTURE
-	dev->fg = *dev->gradients[i] << 24 | *(dev->gradients[i]+1) << 16 | *(dev->gradients[i]+2) << 8 | 0xff;
-#endif /* SDL_RENDER_MODE */
-}
-
-/*
  *	Draw rectangle for SDL with current foreground
  */
-inline void fill_rect(int device_handle, int x, int y, int w, int h)
+inline void fill_rect(int device_handle, int x, int y, int w, int h, uint8_t (*fg)[3])
 {
 	if (device_handle < 0) return;
 
@@ -697,6 +623,13 @@ inline void fill_rect(int device_handle, int x, int y, int w, int h)
 	if (dev->window_resized) return;
 
 	register int i,j,x_max,y_max;
+	register Uint32 fg_color;
+
+#if SDL_RENDER_MODE == SURFACE
+	fg_color = SDL_MapRGB(dev->surface->format, (*fg)[0], (*fg)[1], (*fg)[2]);
+#elif SDL_RENDER_MODE == TEXTURE
+	fg_color = (*fg)[0] << 24 | (*fg)[1] << 16 | (*fg)[2] << 8 | 0xff;
+#endif /* SDL_RENDER_MODE */
 
 	x_max = x + w;
 	y_max = y + h;
@@ -706,13 +639,51 @@ inline void fill_rect(int device_handle, int x, int y, int w, int h)
 	for (j = y; j < y_max; j++) {
         	for (i = x; i < x_max; i++) {
 #if SDL_RENDER_MODE == SURFACE
-        		dev->canvas[(j * dev->surface->w) + i] = dev->fg;
+        		dev->canvas[(j * dev->surface->w) + i] = fg_color;
 #elif SDL_RENDER_MODE == TEXTURE
-        		dev->canvas[(j * dev->pitch) + i] = dev->fg;
+        		dev->canvas[(j * dev->pitch) + i] = fg_color;
 #endif /* RENDER_MODE*/
         	}
         }
 }	
+
+/*
+ *	Draw an 8-bit pattern for SDL on a horizontal line with foreground & background
+ */
+inline void draw_pattern(int device_handle, int x, int y, int psize, uint8_t data, uint8_t (*fg)[3], uint8_t (*bg)[3])
+{
+	if (device_handle < 0) return;
+
+	FBVideo *dev = &fb_video_devices[device_handle];
+
+	register int i, bit, mask;
+	register long offset;
+	register Uint32 fg_color, bg_color;
+
+#if SDL_RENDER_MODE == SURFACE
+	fg_color = SDL_MapRGB(dev->surface->format, (*fg)[0], (*fg)[1], (*fg)[2]);
+	bg_color = SDL_MapRGB(dev->surface->format, (*bg)[0], (*bg)[1], (*bg)[2]);
+#elif SDL_RENDER_MODE == TEXTURE
+	fg_color = (*fg)[0] << 24 | (*fg)[1] << 16 | (*fg)[2] << 8 | 0xff;
+	bg_color = (*bg)[0] << 24 | (*bg)[1] << 16 | (*bg)[2] << 8 | 0xff;
+#endif /* SDL_RENDER_MODE */
+
+	mask = 0x80;
+	offset = ((y * dev->canvas_width) + x);
+	for (bit=0; bit<8; bit++) {
+		if (data & mask) {
+			for (i=0; i<psize; i++) {
+				dev->canvas[offset++] = fg_color;
+			}
+		}
+		else {
+			for (i=0; i<psize; i++) {
+				dev->canvas[offset++] = bg_color;
+			}
+		}
+		mask >>= 1;
+	}
+}
 
 #else /* !WANT_SDL */
 
@@ -774,53 +745,67 @@ static void process_event(int device_handle, int *ret_width, int *ret_height)
 }
 
 /*
- *	Set foreground color for X11
- */
-inline void set_fg_color(int device_handle, int i)
-{
-	if (device_handle < 0) return;
-
-	FBVideo *dev = &fb_video_devices[device_handle];
-
-	dev->fg = &dev->colors[i];
-}
-
-/*
- *	Set foreground gradient value for X11
- */
-inline void set_fg_gradient(int device_handle, int i)
-{
-	if (device_handle < 0) return;
-
-	FBVideo *dev = &fb_video_devices[device_handle];
-
-	dev->fg = &dev->gradients[i];
-}
-
-/*
  *	Fill rectangle for X11 with foreground color
  */
-inline void fill_rect(int device_handle, int x, int y, int w, int h)
+inline void fill_rect(int device_handle, int x, int y, int w, int h, uint8_t (*fg)[3])
 {
 	if (device_handle < 0) return;
 
 	FBVideo *dev = &fb_video_devices[device_handle];
 
-	register int i,j,x_max,y_max;
+	register int i,j,y_max;
+//	register uint32_t *buffer;
+	long offset;
     
-	x_max = x + w;
 	y_max = y + h;
-	if (x_max > dev->canvas_width) x_max = dev->canvas_width;
 	if (y_max > dev->canvas_height) y_max = dev->canvas_height;
-    
+		
 	for (j = y; j < y_max; j++) {
-		for (i = x; i < x_max; i++) {
-	            long offset = ((j * dev->canvas_width) + i) * 4;	/* RGBA */
-	            dev->canvas[offset] = (*dev->fg)[2];
-	            dev->canvas[offset + 1] = (*dev->fg)[1];
-	            dev->canvas[offset + 2] = (*dev->fg)[0];
-	            dev->canvas[offset + 3] = 255;			/* alpha */
+//		buffer = (uint32_t *)dev->canvas + (j * dev->canvas_width) + x;
+//		for (i=0; i<w; i++) *buffer++ = fg;
+		offset = ((j * dev->canvas_width) + x) *4;
+		for (i=0; i<w; i++) {
+			dev->canvas[offset++] = (*fg)[2];
+			dev->canvas[offset++] = (*fg)[1];
+			dev->canvas[offset++] = (*fg)[0];
+			dev->canvas[offset++] = 0xff;
 		}
+	}
+}
+
+/*
+ *	Draw an 8-bit pattern for X11 on a horizontal line with foreground & background
+ */
+inline void draw_pattern(int device_handle, int x, int y, int psize, uint8_t data, uint8_t (*fg)[3], uint8_t (*bg)[3])
+{
+	if (device_handle < 0) return;
+
+	FBVideo *dev = &fb_video_devices[device_handle];
+
+	register int i, bit, mask;
+	long offset;
+
+	mask = 0x80;
+	offset = ((y * dev->canvas_width) + x) * 4;
+	for (bit=0; bit<8; bit++) {
+		if (data & mask) {
+			for (i=0; i<psize; i++) {
+				dev->canvas[offset++] = (*fg)[2];
+				dev->canvas[offset++] = (*fg)[1];
+				dev->canvas[offset++] = (*fg)[0];
+				dev->canvas[offset++] = 0xff;
+			}
+		}
+		else {
+//			for (i=0; i<psize; i++) *buffer++ = bg;
+			for (i=0; i<psize; i++) {
+				dev->canvas[offset++] = (*bg)[2];
+				dev->canvas[offset++] = (*bg)[1];
+				dev->canvas[offset++] = (*bg)[0];
+				dev->canvas[offset++] = 0xff;
+			}
+		}
+		mask >>= 1;
 	}
 }
 
@@ -973,9 +958,8 @@ static void update_display(int device_handle, bool tick)
 		SDL_UnlockTexture(dev->texture);
 		SDL_RenderCopy(dev->renderer, dev->texture, NULL, NULL);
 		SDL_RenderPresent(dev->renderer);
-		int pitch;
-		SDL_LockTexture(dev->texture, NULL, (void **)&dev->canvas, &pitch);
-		dev->pitch = pitch/4;
+		SDL_LockTexture(dev->texture, NULL, (void **)&dev->canvas, &dev->pitch);
+		dev->pitch /= 4;
 #endif /* SDL_RENDER_MODE */
 
 		dev->frames++;
@@ -1019,7 +1003,6 @@ static void *update_thread(void *arg)
 			/* handle resize event */
 			if (dev->window_resized) {
 				if (has_xrender_extension) {
-					XResizeWindow(display, dev->window, dev->window_width, dev->window_height);
 					double x_scale_factor = (double)dev->canvas_width / (double)dev->window_width;					
 					double y_scale_factor = (double)dev->canvas_height / (double)dev->window_height;					
 					dev->transform.matrix[0][0] = XDoubleToFixed(x_scale_factor);
@@ -1079,7 +1062,7 @@ static void *update_thread(void *arg)
 				XLockDisplay(display);
 				if (has_xrender_extension) {
 					XPutImage(display, dev->pixmap, dev->gc, dev->ximage, 0, 0, 0, 0, dev->canvas_width, dev->canvas_height);
-					dev->canvas_pic = XRenderCreatePicture(display, dev->pixmap, dev->pict_format, 0, NULL);
+					XRenderSetPictureFilter(display, dev->canvas_pic, FilterBilinear, NULL, 0);
 					XRenderSetPictureTransform(display, dev->canvas_pic, &dev->transform);
 				        XRenderComposite(display, PictOpSrc, dev->canvas_pic, 0, dev->window_pic,
 				                         0, 0, 0, 0, 0, 0, dev->window_width, dev->window_height);
@@ -1119,8 +1102,6 @@ int fb_video_init(
 	int width,			/* video width in pixel */
 	int height,			/* video height in pixel */
 	const char *title,		/* title of video window */
-	uint8_t (*colors)[3],		/* custom color map (optional) */
-	uint8_t (*gradients)[3],	/* custom gradient map (optional) */
 	bool stats,			/* enable statistics */
 	bool frame_sync,		/* perform changes only during vertical blank period */
 	bool interlaced,		/* enable interlaced display */
@@ -1160,14 +1141,6 @@ int fb_video_init(
 	dev->callback = callback;
 	dev->user_data = user_data;
 	
-	dev->colors = standard_colors;
-	if (colors) {
-		dev->colors = colors;
-	}
-	dev->gradients = standard_gradients;
-	if (gradients) {
-		dev->gradients = gradients;
-	}
 #ifdef HAS_NETSERVER
 	dev->ws_update = ws_update;
 #else
