@@ -5,15 +5,18 @@ z80pack is a mature emulator of multiple platforms with 8080 and Z80 CPU.
 This fork adds a couple of features to Udo Munk's original upstream project:
 - support for S100 sound cards with SDL2 and PortAudio sound frameworks (currently used by Cromemco D+7A and ADS Noisemaker emulation)
 - joystick support (Cromemco D+7A/JS-1) with common game controllers
+- added CPU timer functionality for accurate synchronization of CPU emulation and device emulation
 - more accurate Cromemco Dazzler emulation (performance rendering, interlaced display, line status flag, window resize etc.)
 - support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board)
 - Cromemco Dazzler and D+7A boards now can be individually selected via separate build switches
 - bugfix for Cromemco Cyclops emulation
-- more general structure for SDL2 clients (can also be windowless)
+- more general structure for SDL2 clients (can also be windowless like joysticks)
 
 There have been two reasons for the update.
 
 The first reason is related to the fact that the Cromemco Dazzler hardware is a quite interesting piece of history, which not just brought graphics capabilities to the Altair/Imsai world already in 1975, but also had been designed with some tweaking in mind, achieved with real-time programming the Dazzler registers (see the Dazzler patent for some more information). For this, the emulation has to improve timing accuracy in terms of being in sync with the CPU clock as much as possible. For some tweaks, also the implementation of the odd-even-line status flag is important, which actually is bound to the Dazzler's DMA cycles. The Dazzler started a development of different graphics solutions later from Cromemco itself, but also from Matrox or Vector Graphic, which experimented with different features. The Vector Graphic HiRes board follows a very similar approach as the Dazzler, but drops color support and rather offers its own 8 kByte video buffer mapped into the address space with double the graphics resolution of a Dazzler for monochrome displays.
+
+Udo Monk's original implementation won't allow precise synchronization between the CPU emulation and state machines implementing I/O devices. So I have added a CPU timer capability, which allows to set timers which are bound to CPU execution, similar to the atto timers used in MAME. Synchronization is now possible with single CPU instruction execution granularity. Also, video rendering is now de-coupled from the video device state machines, eliminating the dependency between rendering performance and device emulation.
 
 The second reason is that already in the early times of hobbyist computing, surprisingly complete setups had been developed, such as the Dazzler, D+7A/JS-1 and Cyclops from Cromemco, combining color graphics, human interfacing, sound/music and video digitalization all in one setup. It was an exciting time when much was experimented, and everything seemed possible. Although Udo's original z80pack upstream project already uses SDL2 audio for playing a short sound when pressing the front panel switches, there is no implementation which lets you use the sound output implemented by S100 boards of the time. Same applies to human interface devices other than the console keyboard (such as joysticks), which are not yet part of the original upstream project.
 
@@ -22,7 +25,6 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
 ## General notes/limitations:
 - machines cromemcosim and imsaisim are used as examples how to enable and pre-configure the new hardware emulations (see sim.h, simio.c, simcfg.c and system.conf files)
 - sound cards, joysticks and high resolution graphics currently operate in command line mode only, the z80pack web frontend is missing the appropriate Javascript support (library needs to be updated). Also, there is a bug in the Javascript library which affects the correct rendering of 4x4 (=monochrome) video mode for the Dazzler emulation.
-- be aware that implementations based on non-realtime multi-tasking OS like Windows or Linux will never achieve fully correct timing in emulations. The z80pack core implementation tries to provide in average a roughly correct CPU clock, but doesn't implement continuous timing accuracy.
 - If you need to run the emulation within Microsoft Windows, the Windows Subsystem for Linux (WSL) has a couple of advantages compared to the Cygwin approach of earlier z80pack versions. Since a full Linux is run in a container, we can use a genuine Linux distro of your choice and not just a Posix environment. Also there are significant performance improvements. Unfortunately, WSL offers limited support for audio, and no support at all for using game controllers. See below for how to configure your WSL environment for changing this on your own. It works out a bit tricky, but it works.
 - SDL2 under certain conditions seems to create noise with a phase directly related to the selected audio buffer size, probably when calling the audio callback function. Only seen with Ubuntu (libsdl2-2.0-0 version 2.30.0+dfsg-1ubuntu3.1), no fix yet.
 
@@ -30,8 +32,8 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
 - define HAS_DAZZLER in the appropriate sim.h file to enable this emulation
 - additional config settings in the system.conf file:
 	- set **dazzler_interlaced** to 1 to enable interlaced display for the Dazzler
-	- set **dazzler_line_sync** to 1 for enabling the odd-even-line status flag
-	- set **dazzler_discrete_scale** to 1 if you prefer window sizing with full multiples of the pixel count
+	- set **dazzler_frame_sync** to 1 to avoide frame tearing during the verical scan period
+	- set **dazzler_stats** to 1 to enable some statistics output
 
 ## Notes on Cromemco D+7A
 - define HAS_D7A in the appropriate sim.h file to enable this emulation
@@ -77,7 +79,9 @@ The PortAudio sound framework can be selected instead of SDL2 for emulation of d
 ## WSL notes
 Since the later revisions, the use of z80pack under MS Windows is normally achieved via WSL2. There are, however, a couple of caveats.
 
-First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Since Windows 11, WSL passes audio via an intermediate PulseAudio server to the Windows audio system. With SDL2, and except for the additional delay, this should not be much of a problem. For PortAudio, most ready-to-use PortAudio packages do NOT support PulseAudio out of the box, since PulseAudio has been replaced by ALSA + PipeWire in recent Linux distros. In that case you will get a "PortAudio: Could not open default stream" error message (among others, mostly ALSA errors). The solution is to re-build the PortAudio package with enabling PulseAudio support.
+First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Since Windows 11, WSL passes audio via an intermediate PulseAudio server to the Windows audio system. PulseAudio is known not always to flush data correctly when threads are terminated, which might cause SDL2 to hang during emulator shutdown so that you need to kill the emulator with CTRL-C.
+
+For PortAudio, most ready-to-use PortAudio packages do NOT support PulseAudio out of the box, since PulseAudio has been replaced by ALSA + PipeWire in recent Linux distros. In that case you will get a "PortAudio: Could not open default stream" error message (among others, mostly ALSA errors). The solution is to re-build the PortAudio package with enabling PulseAudio support.
 
 Second, the WSL Linux kernel probably will not be configured out-of-the-box for supporting game controllers. You might have to change the kernel configuration, rebuild the kernel and activate it for WSL. If you plan to use SDL2 with z80pack, also perform the steps in section "Enabling SDL2 support for controllers" below. Overall, enabling audio and controller support with WSL is a bit tricky, but doable.
 
