@@ -7,7 +7,7 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - joystick support (Cromemco D+7A/JS-1) with common game controllers
 - added CPU timer functionality for accurate synchronization of CPU emulation and device emulation
 - more accurate Cromemco Dazzler emulation (performance rendering, interlaced display, line status flag, window resize etc.)
-- support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board) and the versatile CompuPro Spectrum graphics card, utilitizing an advanced MC6847 Video Display Generator chip
+- support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board) and the versatile CompuPro Spectrum graphics card, utilizing an advanced MC6847 Video Display Generator chip
 - Cromemco Dazzler and D+7A boards now can be individually selected via separate build switches
 - bugfix for Cromemco Cyclops emulation
 - more general structure for SDL2 clients (can also be windowless like joysticks)
