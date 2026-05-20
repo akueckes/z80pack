@@ -5,6 +5,37 @@
  *
  * Copyright (C) 2026 by Ansgar Kueckes
  *
+ * Note: Optional axis & button re-mapping is currently implemented via the
+ *       mapping function of the joystick driver, and therefore not available
+ *       with SDL. The button IDs used for the mapping are those defined
+ *       in input-event-codes.h in the Linux kernel source tree.
+ *
+ * If stats are enabled, the joysticks found are identified with their names,
+ * number of axis, number of buttons and current event mappings during start-up.
+ *
+ * You can define your own mapping in the system.conf file with the matching
+ * property:
+ *
+ *   <property-name> <joystick-id> <mapping>
+ *
+ *   where
+ *
+ *       <property-name> is the name for the device property (e.g. d7a_axis_map or
+ *       d7a_button_map)
+ *
+ *       <joystick-id> is the ID of the controller device which shall be re-mapped
+ *       (1 for the first controller, 2 for the second, and so on)
+ *
+ *       <mapping> is a comma separated sequence of numbers, describing the new
+ *	 mapping for the device.
+ *
+ *  Example with 4 axis and 8 buttons:
+ *
+ *       d7a_axis_map	1  1,0,2,3,4
+ *       d7a_button_map	1  1,0,2,3,4,5,6,7,8
+ *
+ *   swaps axis 0 and 1 as well as button 0 and 1.
+ *
  * History:
  * 14-MAR-2026	1.0	Initial Release
  */
@@ -42,6 +73,10 @@ static Joystick *joystick = NULL;
 #ifndef WANT_SDL
 static int joystick_fd[MAX_JOYSTICKS];
 #endif
+
+static uint8_t joystick_axis_map[MAX_JOYSTICKS][ABS_CNT];
+static uint16_t joystick_button_map[MAX_JOYSTICKS][KEY_MAX - BTN_MISC + 1];
+
 
 #ifdef WANT_SDL
 static int client_id = -1;
@@ -142,33 +177,38 @@ int joystick_init(Joystick *joysticks, int stats)
     	dev_path[13] = j + 48;
 	fd = open(dev_path, O_RDONLY | O_NONBLOCK);
 	if (fd < 0) continue;
-	ioctl(fd, JSIOCGNAME(sizeof(buf)), buf);
 	ioctl(fd, JSIOCGAXES, &num_axis);
 	ioctl(fd, JSIOCGBUTTONS, &num_buttons);
-	LOG(TAG, "Joystick found \"%s\" (%d axis, %d buttons)\n", buf, num_axis, num_buttons);
-
-	/* axis & button mappings */
+	/* apply axis & button mappings */
 	if (joystick[j].axis_map) {
+		/* get current mapping */
+		ioctl(fd, JSIOCGAXMAP, &joystick_axis_map[j]);
+		memcpy(&my_axis_map, &joystick_axis_map[j], num_axis * sizeof(uint8_t));
 		LOG(TAG, "Source %d axis mapping: ", j+1);
 		for (i=0; i<num_axis; i++) {
 			if (joystick[j].axis_map[i] < 0) break;
 			LOG(TAG, "%d,",  joystick[j].axis_map[i]);
-			my_axis_map[i] = joystick[j].axis_map[i];
+			my_axis_map[i] = joystick_axis_map[j][joystick[j].axis_map[i]];
 		}
 		LOG(TAG, "\n");
 		ioctl(fd, JSIOCSAXMAP, my_axis_map);
 	}
 	if (joystick[j].button_map) {
+		ioctl(fd, JSIOCGBTNMAP, &joystick_button_map[j]);
+		memcpy(&my_button_map, &joystick_button_map[j], num_buttons * sizeof(uint16_t));
 		LOG(TAG, "Source %d button mapping: ", j+1);
 		for (i=0; i<num_buttons; i++) {
 			if (joystick[j].button_map[i] < 0) break;
 			LOG(TAG, "%d,",  joystick[j].button_map[i]);
-			my_button_map[i] = joystick[j].button_map[i];
+			my_button_map[i] = joystick_button_map[j][joystick[j].button_map[i]];
 		}
 		LOG(TAG, "\n");
 		ioctl(fd, JSIOCSBTNMAP, my_button_map);
 	}
 	if (stats) {
+		ioctl(fd, JSIOCGNAME(sizeof(buf)), buf);
+		LOG(TAG, "Joystick %d found \"%s\" (%d axis, %d buttons)\n", j+1, buf, num_axis, num_buttons);
+
 		ioctl(fd, JSIOCGAXMAP, my_axis_map);
 		LOG(TAG, "Joystick %d axis mapping: ", j+1);
 		for (i=0; i<num_axis; i++)
@@ -190,8 +230,16 @@ int joystick_init(Joystick *joysticks, int stats)
 void joystick_off(void)
 {
 #ifndef WANT_SDL
-	for (int i=0; i<num_joysticks; i++)
+	for (int i=0; i<num_joysticks; i++) {
+		/* restore mappings */
+		if (joystick[i].axis_map)
+			ioctl(joystick_fd[i], JSIOCSAXMAP, joystick_axis_map[i]);
+		if (joystick[i].button_map)
+			ioctl(joystick_fd[i], JSIOCSBTNMAP, joystick_button_map[i]);
+
+		/* close device */
 		if (joystick_fd[i] >= 0) close(joystick_fd[i]);
+	}
 #endif
     joystick = NULL;
 }

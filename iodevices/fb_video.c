@@ -96,7 +96,7 @@
 /* SDL rendering options */
 #define SURFACE	(0)			/* fastest rendering option */
 #define TEXTURE (1)			/* still fast, and can scale freely */
-#define SDL_RENDER_MODE TEXTURE		/* define to either SURFACE or TEXTURE */
+#define SDL_RENDER_MODE SURFACE		/* define to either SURFACE or TEXTURE */
 #define BUSMASTER			/* define to simulate busmaster operation for Dazzler DMA */
 
 #include <stdio.h>

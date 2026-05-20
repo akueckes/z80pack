@@ -56,6 +56,7 @@
 
 #ifdef HAS_D7A
 #include "cromemco-d+7a.h"
+#include "joystick.h"
 #endif
 
 #ifdef HAS_MUSICBOARD
@@ -362,8 +363,8 @@ void config(void)
 				t2 = strtok(NULL, " \t,");
 				if (t2 == NULL) break;
 				j = strtol(t2, NULL, 0);
-				if (j<1 || j>2) {
-					LOGW(TAG, "joystick ID must be 1 or 2\n");
+				if (j<1 || j>MAX_JOYSTICKS) {
+					LOGW(TAG, "joystick ID must be between 1 and %d\n", MAX_JOYSTICKS);
 					break;
 				}
 				j--;
@@ -387,8 +388,8 @@ void config(void)
 				t2 = strtok(NULL, " \t,");
 				if (t2 == NULL) break;
 				j = strtol(t2, NULL, 0);
-				if (j<1 || j>2) {
-					LOGW(TAG, "joystick ID must be 1 or 2\n");
+				if (j<1 || j>MAX_JOYSTICKS) {
+					LOGW(TAG, "joystick ID must be 1 or %d\n", MAX_JOYSTICKS);
 					break;
 				}
 				j--;
