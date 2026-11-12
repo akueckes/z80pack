@@ -12,7 +12,7 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - Bugfix for Cromemco Cyclops emulation
 - More general structure for SDL2 clients (can also be windowless like joysticks)
 
-There have been two reasons for the update.
+There have been two major reasons for the update.
 
 The first reason is related to the fact that the Cromemco Dazzler hardware is a quite interesting piece of history, which not just brought graphics capabilities to the Altair/Imsai world already in 1975, but also had been designed with some tweaking in mind, achieved with real-time programming the Dazzler registers (see the Dazzler patent for some more information). For this, the emulation has to improve timing accuracy in terms of being in sync with the CPU clock as much as possible. For some tweaks, also the implementation of the odd-even-line status flag is important, which actually is bound to the Dazzler's DMA cycles. The Dazzler started a development of different graphics solutions later from Cromemco itself, but also from Matrox or Vector Graphic, which experimented with different features. The Vector Graphic HiRes board follows a very similar approach as the Dazzler, but drops color support and rather offers its own 8 kByte video buffer mapped into the address space with double the graphics resolution of a Dazzler for monochrome displays.
 
