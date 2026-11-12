@@ -8,7 +8,7 @@
  * Copyright (C) 2025 by Thomas Eberhardt
  * Copyright (C) 2026 Ansgar Kueckes
  *
- * Emulation of a Cromemco DAZZLER S100 board
+ * Emulation of a Cromemco TV DAZZLER S100 board
  *
  * History:
  * 24-APR-2015 first version
@@ -229,7 +229,7 @@
 	such as MS Windows, which in fact is no option with z80pack anyway.
 */
 
-#define BUSMASTER			/* define to simulate busmaster operation for Dazzler DMA */
+//#define BUSMASTER	/* define to simulate busmaster operation for Dazzler DMA */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -283,41 +283,41 @@ static bool *vblank;
 static int *field;
 static int *timer_id;
 
-static uint8_t dazzler_colors[16][3] = {
-	{ 0x00, 0x00, 0x00 },
-	{ 0x80, 0x00, 0x00 },
-	{ 0x00, 0x80, 0x00 },
-	{ 0x80, 0x80, 0x00 },
-	{ 0x00, 0x00, 0x80 },
-	{ 0x80, 0x00, 0x80 },
-	{ 0x00, 0x80, 0x80 },
-	{ 0x80, 0x80, 0x80 },
-	{ 0x00, 0x00, 0x00 },
-	{ 0xFF, 0x00, 0x00 },
-	{ 0x00, 0xFF, 0x00 },
-	{ 0xFF, 0xFF, 0x00 },
-	{ 0x00, 0x00, 0xFF },
-	{ 0xFF, 0x00, 0xFF },
-	{ 0x00, 0xFF, 0xFF },
-	{ 0xFF, 0xFF, 0xFF }
+static uint32_t dazzler_colors[16] = {
+	0xFF000000,
+	0xFF800000,
+	0xFF008000,
+	0xFF808000,
+	0xFF000080,
+	0xFF800080,
+	0xFF008080,
+	0xFF808080,
+	0xFF000000,
+	0xFFFF0000,
+	0xFF00FF00,
+	0xFFFFFF00,
+	0xFF0000FF,
+	0xFFFF00FF,
+	0xFF00FFFF,
+	0xFFFFFFFF
 };
-static uint8_t dazzler_gradients[16][3] = {
-	{ 0x00, 0x00, 0x00 },
-	{ 0x11, 0x11, 0x11 },
-	{ 0x22, 0x22, 0x22 },
-	{ 0x33, 0x33, 0x33 },
-	{ 0x44, 0x44, 0x44 },
-	{ 0x55, 0x55, 0x55 },
-	{ 0x66, 0x66, 0x66 },
-	{ 0x77, 0x77, 0x77 },
-	{ 0x88, 0x88, 0x88 },
-	{ 0x99, 0x99, 0x99 },
-	{ 0xAA, 0xAA, 0xAA },
-	{ 0xBB, 0xBB, 0xBB },
-	{ 0xCC, 0xCC, 0xCC },
-	{ 0xDD, 0xDD, 0xDD },
-	{ 0xEE, 0xEE, 0xEE },
-	{ 0xFF, 0xFF, 0xFF }
+static uint32_t dazzler_gradients[16] = {
+	0xFF000000,
+	0xFF111111,
+	0xFF222222,
+	0xFF333333,
+	0xFF444444,
+	0xFF555555,
+	0xFF666666,
+	0xFF777777,
+	0xFF888888,
+	0xFF999999,
+	0xFFAAAAAA,
+	0xFFBBBBBB,
+	0xFFCCCCCC,
+	0xFFDDDDDD,
+	0xFFEEEEEE,
+	0xFFFFFFFF
 };
 
 
@@ -378,7 +378,7 @@ static void process_dma(Dazzler_registers *dazzler, int num_bytes)
 	}
 #ifdef BUSMASTER
 	/* simulate bus master activity */
-	start_bus_request(BUS_DMA_CONTINUOUS, &dazzler_busmaster);
+//	start_bus_request(BUS_DMA_CONTINUOUS, &dazzler_busmaster);
 #endif
 }
 
@@ -389,12 +389,12 @@ static void draw_scanline(BYTE format, int num_bytes, int hires_subrow, int vpos
 {
 	int bytepos;
 	uint8_t i;
-	uint8_t (*fg)[3];
+	uint32_t fg;
 
 	/* select foreground color for x4 mode */
 	if (format & 0x40) {
-		if (format & 0x10) fg = &dazzler_colors[format & 0x0f];
-		else fg = &dazzler_gradients[format & 0x0f];
+		if (format & 0x10) fg = dazzler_colors[format & 0x0f];
+		else fg = dazzler_gradients[format & 0x0f];
 	}
 
 	for (bytepos=0; bytepos<num_bytes; bytepos++) {
@@ -429,19 +429,19 @@ static void draw_scanline(BYTE format, int num_bytes, int hires_subrow, int vpos
 			/* first pixel */
 			i = line_buffer[bytepos] & 0x0f;
 			if (format & 0x10) {
-				fill_rect(fb_video_device, bytepos * 2 * psize, vpos, psize, 1, &dazzler_colors[i]);
+				fill_rect(fb_video_device, bytepos * 2 * psize, vpos, psize, 1, dazzler_colors[i]);
 			}
 			else {
-				fill_rect(fb_video_device, bytepos * 2 * psize, vpos, psize, 1, &dazzler_gradients[i]);
+				fill_rect(fb_video_device, bytepos * 2 * psize, vpos, psize, 1, dazzler_gradients[i]);
 			}
 
 			/* second pixel */
 			i = (line_buffer[bytepos] & 0xf0) >> 4;
 			if (format & 0x10) {
-				fill_rect(fb_video_device, (bytepos * 2 + 1) * psize, vpos, psize, 1, &dazzler_colors[i]);
+				fill_rect(fb_video_device, (bytepos * 2 + 1) * psize, vpos, psize, 1, dazzler_colors[i]);
 			}
 			else {
-				fill_rect(fb_video_device, (bytepos * 2 + 1) * psize, vpos, psize, 1, &dazzler_gradients[i]);
+				fill_rect(fb_video_device, (bytepos * 2 + 1) * psize, vpos, psize, 1, dazzler_gradients[i]);
 			}
 		}
 	}
@@ -472,7 +472,7 @@ static void draw_line_buffer(Dazzler_registers *dazzler, int num_lines, int num_
 			    ((*field == EVEN) && (dazzler->scanline % 2 == 0))) {
 			    	if (dazzler->format & 0x40) {
 					/* erase scanline */
-					fill_rect(fb_video_device, 0, vpos, width, 1, &dazzler_colors[0]);
+					fill_rect(fb_video_device, 0, vpos, width, 1, dazzler_colors[0]);
 				}
 
 			    	/* draw scanline */
@@ -480,13 +480,13 @@ static void draw_line_buffer(Dazzler_registers *dazzler, int num_lines, int num_
 			}
 			else {
 				/* erase scanline */
-				fill_rect(fb_video_device, 0, vpos, width, 1, &dazzler_colors[0]);
+				fill_rect(fb_video_device, 0, vpos, width, 1, dazzler_colors[0]);
 			}
 		}
 		else {
 		    	if (dazzler->format & 0x40) {
 				/* erase scanline */
-				fill_rect(fb_video_device, 0, vpos, width, 1, &dazzler_colors[0]);
+				fill_rect(fb_video_device, 0, vpos, width, 1, dazzler_colors[0]);
 			}
 			draw_scanline(dazzler->format, num_bytes, hires_subrow, vpos, psize);
 		}
@@ -555,7 +555,7 @@ void cromemco_dazzler_timer_callback(void *user_data)
 	}
 }
 
-#else
+#else /* !CPU_TIMER */
 
 /*
  *	Render a full field from video memory into visual w/o CPU synchronization

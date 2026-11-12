@@ -16,10 +16,11 @@ WANT_PORTAUDIO ?= NO
 MACHINE_SRCS = simcfg.c simio.c simmem.c simctl.c
 # machine specific I/O source files
 IO_SRCS = cromemco-dazzler.c cromemco-88ccc.c cromemco-d+7a.c diskmanager.c \
-	tarbell_fdc.c imsai-sio2.c imsai-hal.c imsai-vio.c unix_terminal.c \
+	imsai-sio2.c imsai-hal.c imsai-vio.c unix_terminal.c \
 	unix_network.c netsrv.c generic-at-modem.c libtelnet.c rtc80.c \
 	simbdos.c am9511.c floatcnv.c ova.c \
-	audio.c fb_video.c joystick.c newtech-musicboard.c ads-noisemaker.c vector-graphic-hires.c
+	fb_video.c audio.c joystick.c newtech-musicboard.c ads-noisemaker.c \
+	vector-graphic-hires.c compupro-spectrum.c tarbell_fdc.c
 # machine specific libraries
 CIV_LIB = $(CIV_DIR)/libcivetweb.a
 CIV_LDLIBS = -lcivetweb

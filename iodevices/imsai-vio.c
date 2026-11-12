@@ -66,6 +66,7 @@ static const char *TAG = "VIO";
 int slf = 1;				/* scanlines factor, default no lines */
 uint8_t bg_color[3] = {48, 48, 48};	/* default background color */
 uint8_t fg_color[3] = {255, 255, 255};	/* default foreground color */
+uint16_t vio_address = 0xf000;		/* default start of video refresh memory */
 static int xsize, ysize;		/* window size */
 static int xscale, yscale;
 static int sx, sy;
@@ -488,7 +489,7 @@ static void refresh(void)
 	sx = XOFF;
 	sy = YOFF;
 
-	mode = getmem(0xf7ff);
+	mode = getmem(vio_address + 0x7ff);
 	if (mode != modebuf) {
 		modebuf = mode;
 
@@ -519,8 +520,7 @@ static void refresh(void)
 		event_handler();
 #endif
 #ifdef WANT_SDL
-		SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-		SDL_RenderClear(renderer);
+		memset(pixels, 0, xsize * ysize * 4);
 #else
 		XSetForeground(display, gc, black.pixel);
 		XFillRectangle(display, pixmap, gc, 0, 0, xsize, ysize);
@@ -534,7 +534,7 @@ static void refresh(void)
 			event_handler();
 #endif
 			for (x = 0; x < cols; x++) {
-				c = getmem(0xf000 + (y * cols) + x);
+				c = getmem(vio_address + (y * cols) + x);
 				dc1(c);
 				sx += (res & 1) ? 14 : 7;
 			}
@@ -549,7 +549,7 @@ static void refresh(void)
 			event_handler();
 #endif
 			for (x = 0; x < cols; x++) {
-				c = getmem(0xf000 + (y * cols) + x);
+				c = getmem(vio_address + (y * cols) + x);
 				dc2(c);
 				sx += (res & 1) ? 14 : 7;
 			}
@@ -564,7 +564,7 @@ static void refresh(void)
 			event_handler();
 #endif
 			for (x = 0; x < cols; x++) {
-				c = getmem(0xf000 + (y * cols) + x);
+				c = getmem(vio_address + (y * cols) + x);
 				dc3(c);
 				sx += (res & 1) ? 14 : 7;
 			}
@@ -590,7 +590,7 @@ static void ws_refresh(void)
 {
 	static int cols, rows;
 
-	mode = getmem(0xf7ff);
+	mode = getmem(vio_address + 0x7ff);
 	if (mode != modebuf) {
 		modebuf = mode;
 		memset(dblbuf, 0, 2048);
@@ -628,12 +628,12 @@ static void ws_refresh(void)
 		n = 0;
 		cont = true;
 		while (cont && (i < len)) {
-			val = getmem(0xf000 + i);
+			val = getmem(vio_address + i);
 			while ((val != dblbuf[i]) && (i < len)) {
 				dblbuf[i++] = val;
 				msg.buf[n++] = val;
 				cont = false;
-				val = getmem(0xf000 + i);
+				val = getmem(vio_address + i);
 			}
 			if (cont)
 				break;
@@ -641,9 +641,9 @@ static void ws_refresh(void)
 #define LOOKAHEAD 4
 			/* look-ahead up to 4 bytes for next change */
 			while ((x < LOOKAHEAD) && !cont && (i < len)) {
-				val = getmem(0xf000 + i++);
+				val = getmem(vio_address + i++);
 				msg.buf[n++] = val;
-				val = getmem(0xf000 + i);
+				val = getmem(vio_address + i);
 				if ((i < len) && (val != dblbuf[i])) {
 					cont = true;
 				}
@@ -654,7 +654,7 @@ static void ws_refresh(void)
 			}
 		}
 		if (n) {
-			msg.addr = 0xf000 + addr;
+			msg.addr = vio_address + addr;
 			msg.len = n;
 			net_device_send(DEV_VIO, (char *) &msg, msg.len + 4);
 			LOGD(__func__, "BUF update FROM %04X TO %04X",

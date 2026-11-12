@@ -255,6 +255,9 @@ void init_io(void)
 #ifdef HAS_MODEM
 	modem_device_init();
 #endif
+#ifdef HAS_D7A
+	cromemco_d7a_init();
+#endif
 
 	hal_reset();
 	LOG(TAG, "\r\n");
@@ -299,8 +302,15 @@ void exit_io(void)
 			close(ncons[i].ssc);
 	}
 
+#ifdef HAS_DAZZLER
 	/* shutdown DAZZLER */
 	cromemco_dazzler_off();
+#endif	
+#ifdef HAS_D7A
+	/* shutdown D+7A */
+	cromemco_d7a_off();
+#endif
+	
 }
 
 /*

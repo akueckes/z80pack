@@ -44,7 +44,7 @@ extern void fb_video_hide(int device_handle);
 extern void fb_video_off(int device_handle);
 extern void set_fg_color(int device_handle, int i);
 extern void set_fg_gradient(int device_handle, int i);
-extern void fill_rect(int device_handle, int x, int y, int w, int h, uint8_t (*fg)[3]);
-extern void draw_pattern(int device_handle, int x, int y, int psize, uint8_t data, uint8_t (*fg)[3], uint8_t (*bg)[3]);
+extern void fill_rect(int device_handle, int x, int y, int w, int h, uint32_t fg);
+extern void draw_pattern(int device_handle, int x, int y, int psize, uint8_t data, uint32_t fg, uint32_t bg);
 
 #endif /* !FB_VIDEO_INC */

@@ -40,13 +40,13 @@ static const char *TAG = "D+7A";
 #define DEFAULT_SAMPLE_RATE	22050		/* default audio sample rate in Hz */
 #define DEFAULT_BUFFER_SIZE	64		/* default requested audio buffer size in samples per channel, defines audio delay */
 //#define DEFAULT_SYNC_ADJUST	1.0247		/* default fine tuning for audio sync adjustment */
+#define DEFAULT_SYNC_ADJUST	1.0		/* default fine tuning for audio sync adjustment */
 #define DEFAULT_RECORDING_LIMIT 10000000	/* size of wave buffer for file output & debug purposes */
 
 /* parameters configurable in system.conf */
 unsigned long d7a_sample_rate = DEFAULT_SAMPLE_RATE;
 unsigned long d7a_buffer_size = DEFAULT_BUFFER_SIZE;
-//double d7a_sync_adjust = DEFAULT_SYNC_ADJUST;
-double d7a_sync_adjust = 0.0;
+double d7a_sync_adjust = DEFAULT_SYNC_ADJUST;
 unsigned long d7a_recording_limit = DEFAULT_RECORDING_LIMIT;
 char *d7a_soundfile = NULL;
 int d7a_axis_map[2][65];
@@ -99,7 +99,7 @@ void cromemco_d7a_init(void)
     	LOG(TAG, "D+7A initialized and ready to use\n");
     }
     else {
-    	LOGE(TAG, "Failed to initialize D+7A\n");
+    	LOGE(TAG, "Failed to initialize audio subsystem");
     }
 
     for (i=0; i<2; i++) {
@@ -115,7 +115,7 @@ void cromemco_d7a_init(void)
     int num_joysticks = joystick_init(joysticks, d7a_stats);
 
     if (num_joysticks >= 0) {
-    	LOG(TAG, "%d joystick(s) connected\n", num_joysticks);
+    	LOG(TAG, "%s: %d joystick(s) connected\n", TAG, num_joysticks);
     }	
 }
 

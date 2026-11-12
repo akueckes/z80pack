@@ -145,7 +145,7 @@ static const char *TAG = "audio";
 #endif
 
 #define MAX_NUM_DEVICES		8		/* maximum number of audio devices served */
-#define NUM_CHANNELS 		2		/* number of channels, 2 for stereo */
+#define NUM_CHANNELS 		2		/* number of output channels, 2 for stereo */
 #define FIFO_SIZE		4096		/* circular buffer size per channel */
 
 typedef struct {
@@ -165,6 +165,10 @@ typedef struct {
 	Tstates_t start_ticks;			/* CPU ticks when audio stream and CPU both become active */
 	double sync_adjust;
 	SampleBuffer channel[NUM_CHANNELS];	/* left audio channel */
+	int underflows;				/* statistics */
+	int overflows;
+	int dropouts;
+	int timeouts;
 } FIFO;
 
 typedef struct _audiodevice {
@@ -187,15 +191,9 @@ typedef struct _audiodevice {
 #ifdef WANT_PORTAUDIO
     	PaStream *stream;
 #endif
-    	void (*device_audio_callback)(void *userdata, float *stream, int len);
+    	void (*device_audio_callback)(void *userdata, int16_t *stream, int len);
     	void *device_audio_userdata;
 } Audiodevice;
-
-/* statistics */
-static int underflows = 0;
-static int overflows = 0;
-static int dropouts = 0;
-static int timeouts = 0;
 
 /* global device objects */
 static Audiodevice audio_devices[MAX_NUM_DEVICES];
@@ -205,12 +203,12 @@ static uint32_t used_devices = 0;
 /*
  *	Feed audio data from a circular FIFO buffer into the host's audio subsystem
  */
-static void dac_callback(void *userdata, float *stream, int frame_count)
+static void dac_callback(void *userdata, int16_t *stream, int frame_count)
 {
     FIFO *buffer = &((Audiodevice *)userdata)->buffer;
     int sample_rate = ((Audiodevice*)userdata)->sample_rate;
 
-    float *out = stream;
+    int16_t *out = stream;
     int i = 0, max = 0, c;
 
     /* return if FIFO buffer is in use or no data is available */
@@ -234,7 +232,7 @@ static void dac_callback(void *userdata, float *stream, int frame_count)
     if (buffer->restart) {
     	if (max < (sample_rate / 10)) {
 		/* clear audio buffer */
-		memset(out, 0, frame_count * NUM_CHANNELS * sizeof(float));
+		memset(out, 0, frame_count * NUM_CHANNELS * 2);
 
 		/* unlock FIFO buffer */
 		buffer->lock = 0;
@@ -250,7 +248,7 @@ static void dac_callback(void *userdata, float *stream, int frame_count)
 	for (c=0; c<NUM_CHANNELS; c++) {
 	        if (buffer->channel[c].count > 0) {
 	            /* copy sample to audio buffer */
-		    *out++ = (float)buffer->channel[c].sample[buffer->channel[c].tail] / 128.0;
+		    *out++ = buffer->channel[c].sample[buffer->channel[c].tail] * 256;
 	            buffer->channel[c].count--;
 	            buffer->channel[c].tail = (buffer->channel[c].tail + 1) % FIFO_SIZE;
 		}
@@ -269,21 +267,21 @@ static void dac_callback(void *userdata, float *stream, int frame_count)
  *	This routine will be called by the SDL2 audio framework each time new data
  *	for playback on an audio device is requested.
  */
-static void sdl_audio_callback(void *userdata, uint8_t *stream, int len)
+static void sdl_audio_callback(void *userdata, unsigned char *stream, int len)
 {
     Audiodevice *device = (Audiodevice *)userdata;
-    int num_frames = len / (sizeof(float) * NUM_CHANNELS);
-    float *out = (float *)stream;
+    int num_frames = len / (2 * NUM_CHANNELS);
+    int16_t *out = (int16_t *)stream;
 
     /* call device specific callback routine */
-    device->device_audio_callback(device->device_audio_userdata, (float *)stream, num_frames);
+    device->device_audio_callback(device->device_audio_userdata, (int16_t *)stream, num_frames);
 
     /* save into wave buffer */
     if (device->wave_index < device->recording_limit) {
 	for (int i=0; i<num_frames; i++) {
 		if (device->wave_index < device->recording_limit) {
 			for (int c=0; c<NUM_CHANNELS; c++) {
-				device->wave_buffer[c][device->wave_index] = (int16_t)(*out++ * 32767);
+				device->wave_buffer[c][device->wave_index] = *out++;
 		        }
 		        device->wave_index++;
 		}
@@ -300,7 +298,7 @@ static SDL_AudioDeviceID sdl_audio_init(Audiodevice *device)
 
 	/* prepare audio properties for streaming */
 	desired.freq = device->sample_rate;
-	desired.format = AUDIO_F32SYS;			/* 32 bit floating point (altenatively use AUDIO_S8 or AUDIO_F32SYS) */
+	desired.format = AUDIO_S16SYS;
 	desired.channels = NUM_CHANNELS;
 	desired.samples = device->buffer_size;
 	desired.padding = 0;
@@ -337,6 +335,51 @@ static void sdl_audio_off(SDL_AudioDeviceID device_id)
 
 #ifdef WANT_PORTAUDIO
 /*
+ *	Get an overview of the installed audio devices with their properties
+ */
+void portaudio_getdeviceinfo()
+{
+    // Get the total number of audio devices
+    int deviceCount = Pa_GetDeviceCount();
+    if (deviceCount < 0) {
+        printf("Error getting device count: %s\n", Pa_GetErrorText(deviceCount));
+        Pa_Terminate();
+        return;
+    }
+
+    printf("Found %d audio device(s):\n", deviceCount);
+    printf("==================================================\n");
+
+    /* loop through each device index */
+    for (int i = 0; i < deviceCount; i++) {
+        const PaDeviceInfo* info = Pa_GetDeviceInfo(i);
+        if (info == NULL) {
+            printf("Device %d: Failed to get info.\n", i);
+            continue;
+        }
+
+        /* fetch host API info to identify the driver system (e.g., ALSA, MME, CoreAudio) */
+        const PaHostApiInfo* hostInfo = Pa_GetHostApiInfo(info->hostApi);
+        const char* hostName = (hostInfo != NULL) ? hostInfo->name : "Unknown Host API";
+
+        /* print device capabilities */
+        printf("Device ID:           %d\n", i);
+        printf("  Name:              %s\n", info->name);
+        printf("  Host Driver:       %s\n", hostName);
+        printf("  Max Input Ch:      %d\n", info->maxInputChannels);
+        printf("  Max Output Ch:     %d\n", info->maxOutputChannels);
+        printf("  Default Rate:      %.1f Hz\n", info->defaultSampleRate);
+        
+        /* latency details (converted to milliseconds for readability) */
+        printf("  Low Input Latency:  %.2f ms\n", info->defaultLowInputLatency * 1000.0);
+        printf("  High Input Latency: %.2f ms\n", info->defaultHighInputLatency * 1000.0);
+        printf("  Low Output Latency: %.2f ms\n", info->defaultLowOutputLatency * 1000.0);
+        printf("  High Output Latency:%.2f ms\n", info->defaultHighOutputLatency * 1000.0);
+        printf("--------------------------------------------------\n");
+    }
+}
+
+/*
  *	This routine will be called by the PortAudio engine when audio is needed.
  *	It may called at interrupt level on some machines so don't do anything
  *	that could mess up the system like calling malloc() or free().
@@ -353,7 +396,7 @@ static int paCallback( const void *inputBuffer, void *outputBuffer,
     (void) statusFlags;
     
     Audiodevice *device = (Audiodevice *)userData;
-    float *buffer = (float *)outputBuffer;
+    int16_t *buffer = (int16_t *)outputBuffer;
 
     /* call device specific callback routine */
     device->device_audio_callback(device->device_audio_userdata, outputBuffer, framesPerBuffer);
@@ -363,7 +406,7 @@ static int paCallback( const void *inputBuffer, void *outputBuffer,
 	for (unsigned long i=0; i<framesPerBuffer; i++) {
 		if (device->wave_index < device->recording_limit) {
 			for (int c=0; c<NUM_CHANNELS; c++) {
-				device->wave_buffer[c][device->wave_index] = (int16_t)(*buffer++ * 32767);
+				device->wave_buffer[c][device->wave_index] = *buffer++;
 		        }
 		        device->wave_index++;
 		}
@@ -390,7 +433,7 @@ static int portaudio_init(Audiodevice *device) {
 
     outputParameters.device                    = Pa_GetDefaultOutputDevice();
     outputParameters.channelCount              = NUM_CHANNELS;
-    outputParameters.sampleFormat              = paFloat32;             /* 32 bit floating point output (paInt8 and paInt816 won't work) */
+    outputParameters.sampleFormat              = paInt16;             /* 32 bit floating point output (paInt8 and paInt16 won't work) */
     outputParameters.suggestedLatency          = 0.2;			/* 200 ms */
     outputParameters.hostApiSpecificStreamInfo = NULL;
 
@@ -410,10 +453,10 @@ static int portaudio_init(Audiodevice *device) {
     }
 
     /* get actual sampling rate back */
-    if ((stream_info = Pa_GetStreamInfo(&device->stream))) {
+    if ((stream_info = Pa_GetStreamInfo(device->stream))) {
     	device->sample_rate = (unsigned long)stream_info->sampleRate;
     }
-    
+
     err = Pa_StartStream(device->stream);
     if( err != paNoError ) {
     	LOGE(TAG, "\nPortAudio: Could not start stream\n");
@@ -423,6 +466,7 @@ static int portaudio_init(Audiodevice *device) {
     return 0;
 
 error:
+    printf("\r@@@ ERROR\n");
     Pa_Terminate();
     return -1;
 }
@@ -504,8 +548,8 @@ void audio_record(int device_handle, int c, char data)
 
     /* if required, re-sync with audio stream */
     if (target < buffer->frame_count) {
-    	if (device->sync_adjust == 0.0)
-    		buffer->sync_adjust = (double)(get_clock_us() - buffer->start_time) / (current_ticks - buffer->start_ticks) * f_value;
+    	// TODO: auto-adjust
+	//buffer->sync_adjust = (double)(get_clock_us() - buffer->start_time) / (current_ticks - buffer->start_ticks) * f_value;
     	buffer->frame_offset = buffer->frame_count - target + device->buffer_size;
     }
 
@@ -531,21 +575,21 @@ void audio_record(int device_handle, int c, char data)
     timeout = 1000000;
     while(buffer->lock && !timeout) timeout--;
     if (!timeout) {
-	timeouts++;
+	buffer->timeouts++;
     	return;
     }
     buffer->lock = 1;
 #endif
 
-    if (buffer->channel[c].count == 0) underflows++;
+    if (buffer->channel[c].count == 0) buffer->underflows++;
 
     if (count > (FIFO_SIZE - buffer->channel[c].count)) {
         /* drop new data */
         count = FIFO_SIZE - buffer->channel[c].count;
-        overflows++;
+        buffer->overflows++;
     }
     else if (count > 5) {
-        dropouts++;
+        buffer->dropouts++;
     }
 
     /* append to FIFO buffer (time interpolated) */
@@ -558,8 +602,8 @@ void audio_record(int device_handle, int c, char data)
         current_level = (double)device->last_data[c];
         slope = ((double)data - (double)device->last_data[c]) / (double)count;
         for (i=0; i<count; i++) {
-	        push(&buffer->channel[c], data);
-	        current_level += slope;	
+	        push(&buffer->channel[c], (char)current_level);
+	        current_level += slope;
         }
     }
     else {
@@ -610,7 +654,12 @@ int audio_init(
 	buffer = &device->buffer;
 
 	device->sample_rate = *sample_rate;
+#ifdef WANT_PORTAUDIO
+	UNUSED(buffer_size);
+	device->buffer_size = paFramesPerBufferUnspecified;	// let PortAudio decide
+#else
 	device->buffer_size = *buffer_size;
+#endif
 	device->sync_adjust = sync_adjust;
 	device->stats = stats;
 	device->soundfile = soundfile;
@@ -651,11 +700,13 @@ int audio_init(
 	buffer->start_ticks = 0;
 	buffer->start_frame = 0;
 	buffer->start_time = 0;
-	buffer->sync_adjust = 1.0;
+	buffer->underflows = 0;
+	buffer->overflows = 0;
+	buffer->dropouts = 0;
+	buffer->timeouts = 0;
 
-    	if (device->sync_adjust != 0.0)
-    		buffer->sync_adjust = device->sync_adjust;
-    
+	buffer->sync_adjust = device->sync_adjust;
+
 	for (c=0; c<NUM_CHANNELS; c++) {
 		device->last_ticks[c] = 0;
 		device->timing_error[c] = 0.0;
@@ -664,7 +715,12 @@ int audio_init(
 		buffer->channel[c].count = 0;
 		memset(buffer->channel[c].sample, 0, FIFO_SIZE);
 	}
-	
+
+#if (!WANT_SDL && !WANT_PORTAUDIO)
+    LOGW(TAG, "Audio not supported. Please use WANT_SDL=YES or WANT_PORTAUDIO=YES during build.");
+    return -1;
+#endif
+
 #ifdef WANT_SDL
     if ((device->device_id = sdl_audio_init(device)) == 0) {
     	    LOG(TAG, "Could not initialize SDL audio\n");
@@ -695,7 +751,13 @@ void audio_off(int device_handle)
     int c, buf_index, data_size;
     unsigned long i;
     Audiodevice *device;
+    FIFO *buffer;
     
+#if (!WANT_SDL && !WANT_PORTAUDIO)
+    /* no audio subsystem supported */
+    return;
+#endif
+
     if (device_handle > MAX_NUM_DEVICES) {
     	LOGE(TAG, "Device handle out of range\n");
     	return;
@@ -707,6 +769,7 @@ void audio_off(int device_handle)
     }
 
     device = &audio_devices[device_handle];
+    buffer = &device->buffer;
 
 #pragma pack(1)
     
@@ -776,7 +839,7 @@ void audio_off(int device_handle)
 
     if (device->stats) {
 	LOG(TAG, "Audio DAC: underflows: %d overflows: %d dropouts: %d timeouts: %d\n",
-		underflows, overflows, dropouts, timeouts);
+		buffer->underflows, buffer->overflows, buffer->dropouts, buffer->timeouts);
     }
     
 #ifdef WANT_SDL

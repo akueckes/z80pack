@@ -41,15 +41,17 @@ enum VideoMode {
 	GRADIENT = 1
 };
 
-int vector_graphic_hires_mode = GRADIENT;
-int vector_graphic_hires_address = 0xe000;
-uint8_t vector_graphic_hires_fg_color[3] = {0, 255, 0};
+/* parameters configurable in system.conf */
+int hires_mode = GRADIENT;
+int hires_address = 0xe000;
+int hires_stats = false;
+uint8_t hires_fg_color[3] = { 0x00, 0xff, 0x00 };
 
 #define HSIZE 512
 #define VSIZE 480
 
-static uint8_t hires_colors[2][3];
-static uint8_t hires_gradients[16][3];
+static uint32_t hires_colors[2];
+static uint32_t hires_gradients[16];
 
 static int frames = 0;
 static uint64_t start_time;
@@ -86,12 +88,12 @@ static int fb_video_device = -1;
 static void draw_frame()
 {
 	int bytepos, row, psize;
-	WORD addr = vector_graphic_hires_address;
+	WORD addr = hires_address;
 	BYTE i, data;
 	int current_row;		/* current row within datablock */
 	int num_rows;			/* rows of current pixel resolution */
 	int rows_per_datablock;		/* vertical coverage of a datablock */
-	uint8_t (*fg)[3];
+	uint32_t fg;
 	
 	/* make sure everything is initialized */
 	if (fb_video_device < 0) return;
@@ -100,17 +102,17 @@ static void draw_frame()
 	frames++;
 
 	/* select foreground color for bilevel mode */
-	if (vector_graphic_hires_mode == BILEVEL) {
+	if (hires_mode == BILEVEL) {
 		psize = 2;
 		rows_per_datablock = 2;
 		num_rows = 240;
-		fg = &hires_colors[1];
+		fg = hires_colors[1];
 	}
 	else {
 		psize = 4;
 		rows_per_datablock = 1;
 		num_rows = 120;
-		fg = &hires_gradients[15];
+		fg = hires_gradients[15];
 	}
 
 	/* now draw the frame */
@@ -120,7 +122,7 @@ static void draw_frame()
 		for (bytepos=0; bytepos<64; bytepos++) {
 
 			data = dma_read(addr + bytepos);
-			if (vector_graphic_hires_mode == BILEVEL) {
+			if (hires_mode == BILEVEL) {
 				/* render pixels */
 				i = data;
 				if (row % 2 == 0) {
@@ -150,13 +152,13 @@ static void draw_frame()
 				i = (data & 0xf0) >> 4;
 
 				/* gradient */
-				fill_rect(fb_video_device, bytepos * 2 * psize, row * psize, psize * 2, psize, &hires_gradients[i]);			
+				fill_rect(fb_video_device, bytepos * 2 * psize, row * psize, psize * 2, psize, hires_gradients[i]);			
 
 				/* second pixel */
 				i = data & 0x0f;
 
 				/* gradient */
-				fill_rect(fb_video_device, (bytepos * 2 + 1) * psize, row * psize, psize * 2, psize, &hires_gradients[i]);
+				fill_rect(fb_video_device, (bytepos * 2 + 1) * psize, row * psize, psize * 2, psize, hires_gradients[i]);
 			}
 		}
 
@@ -179,22 +181,18 @@ void vector_graphic_hires_init()
 	float r,g,b;
 
 	/* setup color tables */
-	r = vector_graphic_hires_fg_color[0] / 255.0;
-	g = vector_graphic_hires_fg_color[1] / 255.0;
-	b = vector_graphic_hires_fg_color[2] / 255.0;
+	r = hires_fg_color[0] / 255.0;
+	g = hires_fg_color[1] / 255.0;
+	b = hires_fg_color[2] / 255.0;
 	for (i=0; i<16; i++) {
-		hires_gradients[i][0] = (uint8_t) i*0x11*r;
-		hires_gradients[i][1] = (uint8_t) i*0x11*g;
-		hires_gradients[i][2] = (uint8_t) i*0x11*b;
+		hires_gradients[i] = (uint8_t)(i*0x11*r) << 16 | (uint8_t)(i*0x11*g) << 8 | (uint8_t)(i*0x11*b) | 0xff000000U;
 	}
-	hires_colors[1][0] = r * 255; 
-	hires_colors[1][1] = g * 255; 
-	hires_colors[1][2] = b * 255; 
+	hires_colors[1] = (uint8_t)(r*255) << 16 | (uint8_t)(g*255) << 8 | (uint8_t)(b*255) | 0xff000000U; 
 
 	frames = 0;
 	start_time = get_clock_us();
 
-	fb_video_device = fb_video_init(HSIZE, VSIZE, "Vecor Graphic HiRes",
+	fb_video_device = fb_video_init(HSIZE, VSIZE, "Vector Graphic HiRes",
 		0, 0, 0, 15174, 1460, NULL, &draw_frame, NULL, NULL, NULL, NULL, NULL);
 }
 
@@ -207,8 +205,10 @@ void vector_graphic_hires_off(void)
 		fb_video_off(fb_video_device);
 	fb_video_device = -1;
 
-	double delta = (get_clock_us() - start_time) / 1000000.0;
-	printf("HiRes: delta=%fs, frames/s=%f\r\n", delta, frames / delta);
+	if (hires_stats) {
+		double delta = (get_clock_us() - start_time) / 1000000.0;
+		printf("HiRes: delta=%fs, frames/s=%f\r\n", delta, frames / delta);
+	}
 }
 
 #endif /* HAS_VECTOR_GRAPHIC_HIRES */

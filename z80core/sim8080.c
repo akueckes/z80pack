@@ -618,6 +618,22 @@ void cpu_8080(void)
 		check_gui_break();
 #endif
 
+#ifdef CPU_TIMER
+		for (int i=0; i<cpu_timer_count; i++) {
+			int timer_id = get_cpu_timer_id(i);
+			uint64_t cpu_timer_value = get_cpu_timer(timer_id);
+			if (cpu_timer_value > 0) {
+				if (T > cpu_timer_value) {
+					/* deactivate CPU timer */
+					set_cpu_timer(timer_id, 0);
+					
+					/* call timer callback function, if set */
+					trigger_cpu_timer_callback(timer_id);
+				}
+			}
+		}
+#endif
+
 					/* adjust CPU speed and
 					   update CPU accounting */
 		if (T >= T_max) {
@@ -637,23 +653,6 @@ void cpu_8080(void)
 				cpu_freq = (T * 1000000) / cpu_time;
 			t1 = t2;
 		}
-
-#ifdef CPU_TIMER
-		for (int i=0; i<MAX_CPU_TIMER; i++) {
-			int timer_id = get_cpu_timer_id(i);
-			if (timer_id < 0) continue;
-			uint64_t cpu_timer_value = get_cpu_timer(timer_id);
-			if (cpu_timer_value > 0) {
-				if (T > cpu_timer_value) {
-					/* deactivate CPU timer */
-					set_cpu_timer(timer_id, 0);
-					
-					/* call timer callback function, if set */
-					trigger_cpu_timer_callback(timer_id);
-				}
-			}
-		}
-#endif
 	} while (cpu_state == ST_CONTIN_RUN);
 
 					/* update CPU accounting

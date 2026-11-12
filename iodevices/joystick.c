@@ -1,5 +1,5 @@
 /*
- * audio_dac.c
+ * joystick.c
  *
  * Emulation of game controllers used in multiple devices
  *
@@ -72,11 +72,9 @@ static Joystick *joystick = NULL;
 
 #ifndef WANT_SDL
 static int joystick_fd[MAX_JOYSTICKS];
-#endif
-
 static uint8_t joystick_axis_map[MAX_JOYSTICKS][ABS_CNT];
 static uint16_t joystick_button_map[MAX_JOYSTICKS][KEY_MAX - BTN_MISC + 1];
-
+#endif
 
 #ifdef WANT_SDL
 static int client_id = -1;

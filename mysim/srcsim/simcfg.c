@@ -56,6 +56,7 @@
 
 #ifdef HAS_D7A
 #include "cromemco-d+7a.h"
+#include "joystick.h"
 #endif
 
 #ifdef HAS_MUSICBOARD
@@ -68,6 +69,10 @@
 
 #ifdef HAS_VECTOR_GRAPHIC_HIRES
 #include "vector-graphic-hires.h"
+#endif
+
+#ifdef HAS_COMPUPRO_SPECTRUM
+#include "compupro-spectrum.h"
 #endif
 
 #ifdef HAS_TARBELL_FDC
@@ -358,8 +363,8 @@ void config(void)
 				t2 = strtok(NULL, " \t,");
 				if (t2 == NULL) break;
 				j = strtol(t2, NULL, 0);
-				if (j<1 || j>2) {
-					LOGW(TAG, "joystick ID must be 1 or 2\n");
+				if (j<1 || j>MAX_JOYSTICKS) {
+					LOGW(TAG, "joystick ID must be between 1 and %d\n", MAX_JOYSTICKS);
 					break;
 				}
 				j--;
@@ -383,8 +388,8 @@ void config(void)
 				t2 = strtok(NULL, " \t,");
 				if (t2 == NULL) break;
 				j = strtol(t2, NULL, 0);
-				if (j<1 || j>2) {
-					LOGW(TAG, "joystick ID must be 1 or 2\n");
+				if (j<1 || j>MAX_JOYSTICKS) {
+					LOGW(TAG, "joystick ID must be 1 or %d\n", MAX_JOYSTICKS);
 					break;
 				}
 				j--;
@@ -432,8 +437,6 @@ void config(void)
 				noisemaker_sample_rate = strtol(t2, NULL, 0);
 			} else if (!strcmp(t1, "noisemaker_buffer_size")) {
 				noisemaker_buffer_size = strtol(t2, NULL, 0);
-			} else if (!strcmp(t1, "noisemaker_sync_adjust")) {
-				noisemaker_sync_adjust = atof(t2);
 			} else if (!strcmp(t1, "noisemaker_recording_limit")) {
 				noisemaker_recording_limit = strtol(t2, NULL, 0);
 			} else if (!strcmp(t1, "noisemaker_soundfile")) {
@@ -442,13 +445,13 @@ void config(void)
 				*s = 0;
 #endif
 #ifdef HAS_VECTOR_GRAPHIC_HIRES
-			} else if (!strcmp(t1, "vector_graphic_hires_mode")) {
-				if (!strncmp(t2, "bilevel", 7)) vector_graphic_hires_mode = 0;
-				else if (!strncmp(t2, "gradient", 8)) vector_graphic_hires_mode = 1;
+			} else if (!strcmp(t1, "hires_mode")) {
+				if (!strncmp(t2, "bilevel", 7)) hires_mode = 0;
+				else if (!strncmp(t2, "gradient", 8)) hires_mode = 1;
 				else LOGW(TAG, "invalid value for %s: %s", t1, t2);
-			} else if (!strcmp(t1, "vector_graphic_hires_address")) {
-				vector_graphic_hires_address = strtol(t2, NULL, 0);
-			} else if (!strcmp(t1, "vector_graphic_hires_fg")) {
+			} else if (!strcmp(t1, "hires_address")) {
+				hires_address = strtol(t2, NULL, 0);
+			} else if (!strcmp(t1, "hires_fg")) {
 				if ((t3 = strtok(NULL, " \t,")) == NULL ||
 				    (t4 = strtok(NULL, " \t,")) == NULL) {
 					LOGW(TAG, "missing parameter for %s", t1);
@@ -469,9 +472,85 @@ void config(void)
 					LOGW(TAG, "invalid blue component %d", v3);
 					continue;
 				}
-				vector_graphic_hires_fg_color[0] = v1;
-				vector_graphic_hires_fg_color[1] = v2;
-				vector_graphic_hires_fg_color[2] = v3;
+				hires_fg_color[0] = v1;
+				hires_fg_color[1] = v2;
+				hires_fg_color[2] = v3;
+			} else if (!strcmp(t1, "hires_stats")) {
+				switch (*t2) {
+				case '0':
+					hires_stats = false;
+					break;
+				case '1':
+					hires_stats = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+#endif
+#ifdef HAS_COMPUPRO_SPECTRUM
+			} else if (!strcmp(t1, "spectrum_address")) {
+				spectrum_address = strtol(t2, NULL, 0);
+			} else if (!strcmp(t1, "spectrum_interlaced")) {
+				switch (*t2) {
+				case '0':
+					spectrum_interlaced = false;
+					break;
+				case '1':
+					spectrum_interlaced = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+			} else if (!strcmp(t1, "spectrum_frame_sync")) {
+				switch (*t2) {
+				case '0':
+					spectrum_frame_sync = false;
+					break;
+				case '1':
+					spectrum_frame_sync = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+			} else if (!strcmp(t1, "spectrum_border")) {
+				switch (*t2) {
+				case '0':
+					spectrum_border = false;
+					break;
+				case '1':
+					spectrum_border = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+			} else if (!strcmp(t1, "spectrum_artifacts")) {
+				switch (*t2) {
+				case '0':
+					spectrum_artifacts = false;
+					break;
+				case '1':
+					spectrum_artifacts = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
+			} else if (!strcmp(t1, "spectrum_stats")) {
+				switch (*t2) {
+				case '0':
+					spectrum_stats = false;
+					break;
+				case '1':
+					spectrum_stats = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
 #endif
 #ifdef HAS_TARBELL_FDC
 			} else if (!strcmp(t1, "tarbell_rom_enabled")) {
@@ -538,6 +617,8 @@ void config(void)
 			} else if (!strcmp(t1, "vio_scanlines")) {
 				if (*t2 != '0')
 					slf = 2;
+			} else if (!strcmp(t1, "vio_address")) {
+				vio_address = strtol(t2, NULL, 0);
 			} else if (!strcmp(t1, "ram")) {
 				if (num_segs >= MAXMEMMAP) {
 					LOGW(TAG, "too many rom/ram statements");

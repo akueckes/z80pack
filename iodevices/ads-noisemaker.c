@@ -30,17 +30,7 @@
  *  access to the PSG registers plus stereo amplifier, so just refer to the
  *  AY-3-8910 data sheets for details on programming that PSG.
  *  
- *  Sound implementation needs a real time wave interface, and is based on
- *  the very common PortAudio and SDL2 platforms, which are available for most
- *  systems, including Linux, MacOS and Windows.
- *
- *  Whereas the audio subsystem will coninuously try to request real time
- *  sample data from the application, driving a realtime process from
- *  an emulation which is emulating CPU clocks in bursts requires
- *  synchronistaion of CPU ticks with the audio stream, which is done
- *  utilizing a circular FIFO buffer.
- *
- *  All host audio specific code is in the file audio.c
+ *  All host specific code for audio playback is in the file audio.c
  *
  *  Pitch-to-frequency relationship for the AY-3-891x:
  *
@@ -78,7 +68,6 @@
  *  10-OCT-2024  Initial release
  *  20-OCT-2025  Added SDL2 support
  *  19-APR-2026  Complete redesign of the audio emulation
- *               Syncing CPU emulation with audio stream
  *
  */
 
@@ -105,20 +94,17 @@
 
 // #define LOG_LOCAL_LEVEL LOG_DEBUG
 #include "log.h"
-static const char *TAG = "NOISEMAKER";
+static const char *TAG = "Noisemaker";
 
 #define PORT_COUNT  8
 
 #define DEFAULT_SAMPLE_RATE	44100		/* default audio sample rate in Hz */
-#define DEFAULT_BUFFER_SIZE	1024		/* default requested audio buffer size per channel, defines audio delay */
-//#define DEFAULT_SYNC_ADJUST	1.0247		/* default fine tuning for audio sync adjustment */
+#define DEFAULT_BUFFER_SIZE	64		/* default requested audio buffer size per channel, defines audio delay */
 #define DEFAULT_RECORDING_LIMIT 10000000	/* size of wave buffer for file output & debug purposes */
 
 /* parameters configurable in system.conf */
 unsigned long noisemaker_sample_rate = DEFAULT_SAMPLE_RATE;
 unsigned long noisemaker_buffer_size = DEFAULT_BUFFER_SIZE;
-//double noisemaker_sync_adjust = DEFAULT_SYNC_ADJUST;
-double noisemaker_sync_adjust = 0.0;
 unsigned long noisemaker_recording_limit = DEFAULT_RECORDING_LIMIT;
 char *noisemaker_soundfile = NULL;
 
@@ -594,84 +580,10 @@ void psg_out(struct ayumi* ay, int register_select, BYTE data)
 
 /* ---------------End AY-3-8910 -------------- */
 
-#define FIFO_SIZE	256
-
-typedef struct {
-	unsigned long target;		/* frame number where the command applies */
-	uint8_t psg;			/* PSG chip select */
-	uint8_t reg;			/* PSG register */
-	uint8_t value;			/* PSG value */
-} AyEntry;
-
-typedef struct {
-	int head;			/* latest entry */
-	int tail;			/* oldest entry */
-	int count;			/* total entries */
-	unsigned long frame_count;	/* how many frames have been streamed */
-	unsigned long frame_offset;	/* offset between CPU ticks and frame count */
-	unsigned long start_frame;	/* frame number when audio stream and CPU both become active */
-	unsigned long start_time;	/* time when audio stream and CPU both become active */
-	Tstates_t start_ticks;		/* CPU ticks when audio stream and CPU both become active */
-	double sync_adjust;
-	AyEntry entry[FIFO_SIZE];	/* FIFO data */
-} FIFO;
-
 struct ads_noisemaker {
     struct ayumi psg1;			/* PSG 1 (left channel) */
     struct ayumi psg2;			/* PSG 2 (right channel) */
-    FIFO buffer;
 };
-
-/*
- *	Push sample data into FIFO
- */
-static int push(FIFO *buffer, AyEntry *entry)
-{
-    int result = 0;
-
-    if (buffer->count == FIFO_SIZE) {
-        buffer->tail = (buffer->tail + 1) % FIFO_SIZE;		/* buffer overflow */
-        result = -1;
-    } else {
-        buffer->count++;
-    }
-
-    buffer->entry[buffer->head].target = entry->target;
-    buffer->entry[buffer->head].psg = entry->psg;
-    buffer->entry[buffer->head].reg = entry->reg;
-    buffer->entry[buffer->head].value = entry->value;
-    buffer->head = (buffer->head + 1) % FIFO_SIZE;
-
-    return result;
-}
-
-/*
- *	Return next sample without removing it from the FIFO
- */
-static int peek(FIFO *buffer, AyEntry *entry)
-{
-    if (buffer->count == 0) return 0;
-    
-    entry->target = buffer->entry[buffer->tail].target;
-    entry->psg = buffer->entry[buffer->tail].psg;
-    entry->reg = buffer->entry[buffer->tail].reg;
-    entry->value = buffer->entry[buffer->tail].value;
-    
-    return 1;
-}
-
-/*
- *	Returns the next sample removing it from the FIFO
- */
-static int pop(FIFO *buffer)
-{
-    if (buffer->count == 0) return 0;
- 
-    buffer->tail = (buffer->tail + 1) % FIFO_SIZE;
-    buffer->count--;
-
-    return 1;
-}
 
 typedef struct {
     int16_t channel_1;
@@ -685,42 +597,20 @@ static int psg_register_select_2 = 0;
 /*
  *	To be called by the host audio subsystem if new audio data is needed
  */
-void noisemaker_audio_callback(void *userdata, float *stream, int frame_count)
+void noisemaker_audio_callback(void *userdata, int16_t *stream, int frame_count)
 {
-    /* cast data passed through stream to our structure. */
     struct ads_noisemaker *board = (struct ads_noisemaker *)userdata;
+    int16_t *out = stream;
+
     struct ayumi *ay1 = &(board->psg1);
     struct ayumi *ay2 = &(board->psg2);
-    FIFO *buffer = &board->buffer;
-    AyEntry entry;
-    float *out = stream;
+ 
     int i;
     
     if ((frame_count == 0) || (stream == NULL)) return;
-    	
-    /* register when both audio stream and CPU become active */
-    if ((buffer->start_ticks == 0) && (T > 0)) {
-    	buffer->start_ticks = T;
-    	buffer->start_frame = buffer->frame_count;
-    	buffer->start_time = get_clock_us();
-    }
-    	
-    /* process pending PSG commands */
-    for(;;) {
-    	if (peek(buffer, &entry) == 0) break;
-    	if (entry.target > buffer->frame_count) break;
-	if (entry.psg == 1) {
-		psg_out(ay1, entry.reg, entry.value);
-	}
-	else if (entry.psg == 2) {
-		psg_out(ay2, entry.reg, entry.value);
-	}
-	pop(buffer);
-    }
 
     /* serve the audio stream */
     for (i=0; i<frame_count; i++) {
-
         /* process PSG data */
         ayumi_process(ay1);
         ayumi_process(ay2);
@@ -728,11 +618,9 @@ void noisemaker_audio_callback(void *userdata, float *stream, int frame_count)
         ayumi_remove_dc(ay2);
 
 	/* stream audio data */
-        *out++ = (float)ay1->sample;           /* channel 1 */
-        *out++ = (float)ay2->sample;           /* channel 2 */
+        *out++ = ay1->sample * 32767;           /* channel 1 */
+        *out++ = ay2->sample * 32767;           /* channel 2 */
     }
-
-    buffer->frame_count += frame_count;
 }
 
 static uint64_t start_time = 0;
@@ -747,7 +635,6 @@ void ads_noisemaker_init(void)
 
     struct ayumi* ay1 = &(sound_board.psg1);
     struct ayumi* ay2 = &(sound_board.psg2);
-    FIFO *buffer = &sound_board.buffer;
 
 #ifdef HAS_NETSERVER
     if (n_flag) {
@@ -763,38 +650,32 @@ void ads_noisemaker_init(void)
     ayumi_set_mixer(ay2, 0, 0, 1, 0);
     ayumi_set_volume(ay2, 0, 0xf);
     
-    /* initialize ring buffer */
-    buffer->head = 0;
-    buffer->tail = 0;
-    buffer->count = 0;
-    buffer->frame_count = 0;
-    buffer->frame_offset = 0;
-    buffer->start_ticks = 0;
-    buffer->start_frame = 0;
-    buffer->start_time = 0;
-    buffer->sync_adjust = 1.0;
-
-    if (noisemaker_sync_adjust != 0.0)
-    	buffer->sync_adjust = noisemaker_sync_adjust;
-    
     start_time = get_clock_us();
     T_start = T;    
     
     audio_device = audio_init(
     	&noisemaker_sample_rate,			/* requested sample rate in samples/s, returns actual sample rate */
     	&noisemaker_buffer_size,			/* requested audio buffer size, returns actual buffer size */
-    	0.0,						/* sync adjust (DAC only) */
+    	0,						/* sync adjust (DAC only) */
     	0,						/* output statistics for fine tuning (DAC only) */
     	noisemaker_soundfile,				/* wanted recording sound file */
     	noisemaker_recording_limit,			/* wanted recording limit in bytes */
-    	&noisemaker_audio_callback,			/* callback (PSG only) */
-    	&sound_board);					/* user data for callback (PSG only) */
+    	&noisemaker_audio_callback,			/* PSG callback */
+    	&sound_board);					/* user data for PSG callback */
+
+	printf("\rNoisemaker rate=%lu size=%lu file=%s limit=%lu callback=%lu data=%lu\n",
+	    	noisemaker_sample_rate,			/* requested sample rate in samples/s, returns actual sample rate */
+	    	noisemaker_buffer_size,			/* requested audio buffer size, returns actual buffer size */
+	    	noisemaker_soundfile,				/* wanted recording sound file */
+	    	noisemaker_recording_limit,			/* wanted recording limit in bytes */
+	    	(unsigned long)&noisemaker_audio_callback,			/* PSG callback */
+	    	(unsigned long)&sound_board);					/* user data for PSG callback */
 
     if (audio_device >= 0) {
     	LOG(TAG, "Noisemaker initialized and ready to use\n");
     }
     else {
-    	LOGE(TAG, "Failed to initialize Noisemaker\n");
+    	LOGE(TAG, "Failed to initialize audio subsystem");
     }
 }
 
@@ -813,10 +694,6 @@ void ads_noisemaker_off()
  */
 static void ads_noisemaker_out(BYTE port, BYTE data)
 {
-    AyEntry entry;
-    FIFO *buffer = &sound_board.buffer;
-    unsigned long target;
-
     outPort[port] = data;
 
     LOGD(TAG, "ADS Noisemaker: Output %02X on port %02X\n", data, port);
@@ -831,57 +708,19 @@ static void ads_noisemaker_out(BYTE port, BYTE data)
 
     /* ---------- Noisemaker ---------- */
 
-    /* sync CPU ticks with audio stream */
-
-#if 1 //#ifdef WANT_SDL
-    unsigned long delay = 10 * f_value * 1000;
-    unsigned long delta_T = T - buffer->start_ticks;
-    unsigned long delta_f = buffer->frame_count - buffer->start_frame;
-    target = buffer->start_frame + (delta_f * (delta_T + delay)) / delta_T;
-#endif
-
-#if 0 //#ifdef WANT_PORTAUDIO    
-    target = ((T - buffer->start_ticks) * noisemaker_sample_rate / (f_value * 1000000) + buffer->frame_offset) * buffer->sync_adjust;
-
-    /* if required, re-sync with audio stream */
-    if (target < buffer->frame_count) {
-    	if (noisemaker_sync_adjust == 0.0)
-    		buffer->sync_adjust = (double)(get_clock_us() - buffer->start_time) / (T - buffer->start_ticks) * f_value;
-    	buffer->frame_offset = buffer->frame_count - target;
-    	printf("\nresync start_frame=%lu start_ticks=%lu target=%lu frame_count=%lu offset=%lu sample_rate=%lu buffer_size=%lu sync_adjust=%f\n",
-    		buffer->start_frame, buffer->start_ticks, target, buffer->frame_count, buffer->frame_offset, noisemaker_sample_rate, noisemaker_buffer_size, buffer->sync_adjust);
-    }
-#endif
-
     /* update PSG status */
     switch(port) {
     case 0:     /* select PSG register of first PSG */
             psg_register_select_1 = data & 0xf;
             break;
     case 1:     /* output data first PSG */
-    	    entry.target = target;
-    	    entry.psg = 1;
-    	    entry.reg = psg_register_select_1;
-    	    entry.value = data;
-    	    push(buffer, &entry);
-#if 1
-    	    printf("\rpsg=1 reg=%d value=%02X count=%d target=%lu frame_count=%lu\n",
-    	        entry.reg, entry.value, buffer->count, target, buffer->frame_count);
-#endif
+	    psg_out(&sound_board.psg1, psg_register_select_1, data);
             break;
     case 2:     /* select PSG register of second PSG */
             psg_register_select_2 = data & 0xf;
             break;
     case 3:     /* output data second PSG */
-    	    entry.target = target;
-    	    entry.psg = 2;
-    	    entry.reg = psg_register_select_2;
-    	    entry.value = data;
-    	    push(buffer, &entry);
-#if 1
-    	    printf("\rpsg=2 reg=%d value=%02X count=%d target=%lu frame_count=%lu\n",
-    	        entry.reg, entry.value, buffer->count, target, buffer->frame_count);
-#endif
+	    psg_out(&sound_board.psg2, psg_register_select_2, data);
             break;
     default:    /* ignore all other ports */
             ;

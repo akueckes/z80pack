@@ -178,7 +178,7 @@ static int graphic_modes[8][3] = {
 	{ 2, 256, 192 }		/* RG6 bilevel 256 x 192 */
 };
 
-int spectrum_address = 0xa000;
+int spectrum_address = 0xa000;	/* default */
 int spectrum_border = true;
 int spectrum_interlaced = false;
 int spectrum_frame_sync = false;
@@ -208,46 +208,46 @@ static int fb_video_device = -1;
 static int border = 0;
 
 /* color shades from MAME */
-static uint8_t spectrum_colors[32][3] = {
+static uint32_t spectrum_colors[32] = {
 	/* standard colors */
-	{ 0x00, 0xd0, 0x00 }, // 0 GREEN
-	{ 0xd0, 0xd0, 0x00 }, // 1 YELLOW
-	{ 0x00, 0x00, 0xd0 }, // 2 BLUE
-	{ 0xd0, 0x00, 0x00 }, // 3 RED
-	{ 0xd0, 0xd0, 0xd0 }, // 4 BUFF
-	{ 0x00, 0xd0, 0xd0 }, // 5 CYAN
-	{ 0xd0, 0x00, 0xd0 }, // 6 MAGENTA
-	{ 0xff, 0x7f, 0x00 }, // 7 ORANGE
+	0xff00d000, // 0 GREEN
+	0xffd0d000, // 1 YELLOW
+	0xff0000d0, // 2 BLUE
+	0xffd00000, // 3 RED
+	0xffd0d0d0, // 4 BUFF
+	0xff00d0d0, // 5 CYAN
+	0xffd000d0, // 6 MAGENTA
+	0xffff7f00, // 7 ORANGE
         
 	/* 2 color graphics mode colors */
-	{ 0x26, 0x30, 0x16 }, // 8 BLACK
-	{ 0x30, 0xd2, 0x00 }, // 9 GREEN
-	{ 0x26, 0x30, 0x16 }, // 10 BLACK
-	{ 0xbf, 0xc8, 0xad }, // 11 BUFF
+	0xff263016, // 8 BLACK
+	0xff30d200, // 9 GREEN
+	0xff263016, // 10 BLACK
+	0xffbfc8ad, // 11 BUFF
         
 	/* alpha mode colors */
-	{ 0x00, 0x7c, 0x00 }, // 12 ALPHANUMERIC DARK GREEN
-	{ 0x30, 0xd2, 0x00 }, // 13 ALPHANUMERIC BRIGHT GREEN
-	{ 0x6b, 0x27, 0x00 }, // 14 ALPHANUMERIC DARK ORANGE
-	{ 0xff, 0xb7, 0x00 }, // 15 ALPHANUMERIC BRIGHT ORANGE
+	0xff007c00, // 12 ALPHANUMERIC DARK GREEN
+	0xff30d200, // 13 ALPHANUMERIC BRIGHT GREEN
+	0xff6b2700, // 14 ALPHANUMERIC DARK ORANGE
+	0xffffb700, // 15 ALPHANUMERIC BRIGHT ORANGE
 
 	/* artifact colors */
-	{ 0x00, 0x00, 0x00 }, // 16 Black		own:	0x0 -> black
-	{ 0x00, 0x00, 0x40 }, // 17 Dark Blue/Red		0x1 -> blue
-	{ 0x00, 0x40, 0x00 }, // 18 Dark Green			0x2 -> yellow-green/black
-	{ 0x00, 0x00, 0x80 }, // 19 Medium Blue                 0x3 -> orange/violett
-	{ 0x40, 0x20, 0x00 }, // 20 Brown/Dark Red              0x4 -> blue
-	{ 0x80, 0x00, 0x00 }, // 21 Solid Red (or Blue)         0x5 -> solid blue
-	{ 0x40, 0x20, 0x00 }, // 22 Orange/Brown                0x6 -> grey-orange/brown
-	{ 0xa0, 0x00, 0xa0 }, // 23 Light Pink/Cyan             0x7 -> violett/blue
-	{ 0x00, 0x00, 0x40 }, // 24 Dark Blue                   0x8 -> yellow-green/black (same as 0x2)
-	{ 0x80, 0x00, 0x80 }, // 25 Purple/Violet               0x9 -> grey/dark red
-	{ 0x00, 0x00, 0x80 }, // 26 Solid Blue (or Red)         0xa -> solid green
-	{ 0x80, 0x80, 0xd0 }, // 27 Sky Blue                    0xb -> yellow/green
-	{ 0xd0, 0xe0, 0x00 }, // 28 Yellow/Green                0xc -> violett/yellow
-	{ 0xd0, 0x80, 0x00 }, // 29 Light Orange                0xd -> violett/blue (same as 0x7)
-	{ 0xd0, 0xd0, 0xe0 }, // 30 White/Cyan                  0xe -> yellow/green (same as 0x2)
-	{ 0xd0, 0xd0, 0xd0 }  // 31 White                       0xf -> solid buff
+	0xff000000, // 16 Black		own:	0x0 -> black
+	0xff000040, // 17 Dark Blue/Red		0x1 -> blue
+	0xff004000, // 18 Dark Green			0x2 -> yellow-green/black
+	0xff000080, // 19 Medium Blue                 0x3 -> orange/violett
+	0xff402000, // 20 Brown/Dark Red              0x4 -> blue
+	0xff800000, // 21 Solid Red (or Blue)         0x5 -> solid blue
+	0xff402000, // 22 Orange/Brown                0x6 -> grey-orange/brown
+	0xffa000a0, // 23 Light Pink/Cyan             0x7 -> violett/blue
+	0xff000040, // 24 Dark Blue                   0x8 -> yellow-green/black (same as 0x2)
+	0xff800080, // 25 Purple/Violet               0x9 -> grey/dark red
+	0xff000080, // 26 Solid Blue (or Red)         0xa -> solid green
+	0xff8080d0, // 27 Sky Blue                    0xb -> yellow/green
+	0xffd0e000, // 28 Yellow/Green                0xc -> violett/yellow
+	0xffd08000, // 29 Light Orange                0xd -> violett/blue (same as 0x7)
+	0xffd0d0e0, // 30 White/Cyan                  0xe -> yellow/green (same as 0x2)
+	0xffd0d0d0  // 31 White                       0xf -> solid buff
 };
 
 static uint8_t spectrum_fontdata8x12[] =
@@ -323,16 +323,16 @@ static uint8_t spectrum_fontdata8x12[] =
  */
 static void draw_scanline(int scanline, WORD *addr)
 {
-	BYTE data;
+	BYTE data = 0;
 	WORD row_addr;
 	int i, col, num_cols, num_rows, num_colors, pwidth, pheight, char_code;
-	uint8_t (*fg)[3], (*bg)[3];
+	uint32_t fg, bg;
 
 	if (spectrum_interlaced) {
 		if (((*field == ODD) && (scanline % 2 == 1)) ||
 		    ((*field == EVEN) && (scanline % 2 == 0))) {
 		    	/* draw a black line */
-			fill_rect(fb_video_device, 0, scanline, HSIZE + border * 2, 1, &spectrum_colors[8]);
+			fill_rect(fb_video_device, 0, scanline, HSIZE + border * 2, 1, spectrum_colors[8]);
 			
 			/* update current memory address */
 			if (spectrum.mode == ALPHA) {
@@ -357,11 +357,11 @@ static void draw_scanline(int scanline, WORD *addr)
 	switch (spectrum.mode) {
 	case RAM:
 		if ((scanline < border) || (scanline > VSIZE+border))
-			fill_rect(fb_video_device, 0, scanline, HSIZE + border * 2, 1, &spectrum_colors[8]);
+			fill_rect(fb_video_device, 0, scanline, HSIZE + border * 2, 1, spectrum_colors[8]);
 		else {
-			fill_rect(fb_video_device, 0, scanline, border, 1, &spectrum_colors[8]);
-			fill_rect(fb_video_device, border, scanline, HSIZE, 1, &spectrum_colors[7]);
-			fill_rect(fb_video_device, HSIZE + border , scanline, border, 1, &spectrum_colors[8]);
+			fill_rect(fb_video_device, 0, scanline, border, 1, spectrum_colors[8]);
+			fill_rect(fb_video_device, border, scanline, HSIZE, 1, spectrum_colors[7]);
+			fill_rect(fb_video_device, HSIZE + border , scanline, border, 1, spectrum_colors[8]);
 		}
 		break;
 	case ALPHA:	/* alphanumeric & semigraphics 32 x 16 */
@@ -371,9 +371,9 @@ static void draw_scanline(int scanline, WORD *addr)
 		pheight = VSIZE / num_rows;
 
 		if ((scanline < border) || (scanline >= VSIZE+border))
-			fill_rect(fb_video_device, 0, scanline, HSIZE + border * 2, 1, &spectrum_colors[8]);
+			fill_rect(fb_video_device, 0, scanline, HSIZE + border * 2, 1, spectrum_colors[8]);
 		else {
-			fill_rect(fb_video_device, 0, scanline, border, 1, &spectrum_colors[8]);
+			fill_rect(fb_video_device, 0, scanline, border, 1, spectrum_colors[8]);
 			row_addr = *addr;
 			for (col=0; col<num_cols; col++) {
 				data = dma_read((*addr)++);
@@ -381,48 +381,48 @@ static void draw_scanline(int scanline, WORD *addr)
 					if ((scanline - border) % 24 < 12) {
 						/* upper left quadrant */
 						if (data & 0x08)
-							fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth / 2, 1, &spectrum_colors[(data & 0x70) >> 4]);
+							fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth / 2, 1, spectrum_colors[(data & 0x70) >> 4]);
 						else
-							fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth / 2, 1, &spectrum_colors[8]);
+							fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth / 2, 1, spectrum_colors[8]);
 	
 						/* upper right quadrant */
 						if (data & 0x04)
-							fill_rect(fb_video_device, border + col * pwidth + pwidth / 2, scanline, pwidth / 2, 1, &spectrum_colors[(data & 0x70) >> 4]);
+							fill_rect(fb_video_device, border + col * pwidth + pwidth / 2, scanline, pwidth / 2, 1, spectrum_colors[(data & 0x70) >> 4]);
 						else
-							fill_rect(fb_video_device, border + col * pwidth + pwidth / 2, scanline, pwidth / 2, 1, &spectrum_colors[8]);
+							fill_rect(fb_video_device, border + col * pwidth + pwidth / 2, scanline, pwidth / 2, 1, spectrum_colors[8]);
 	
 						/* lower left quadrant */
 					}
 					else {
 						if (data & 0x02)
-							fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth / 2, 1, &spectrum_colors[(data & 0x70) >> 4]);
+							fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth / 2, 1, spectrum_colors[(data & 0x70) >> 4]);
 						else
-							fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth / 2, 1, &spectrum_colors[8]);
+							fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth / 2, 1, spectrum_colors[8]);
 	
 						/* lower right quadrant */
 						if (data & 0x01)
-							fill_rect(fb_video_device, border + col * pwidth + pwidth / 2, scanline, pwidth / 2, 1, &spectrum_colors[(data & 0x70) >> 4]);
+							fill_rect(fb_video_device, border + col * pwidth + pwidth / 2, scanline, pwidth / 2, 1, spectrum_colors[(data & 0x70) >> 4]);
 						else
-							fill_rect(fb_video_device, border + col * pwidth + pwidth / 2, scanline, pwidth / 2, 1, &spectrum_colors[8]);
+							fill_rect(fb_video_device, border + col * pwidth + pwidth / 2, scanline, pwidth / 2, 1, spectrum_colors[8]);
 					}
 				}
 				else {		/* alphanumerics with 64 characters */
 					char_code = data & 0x3f;
 
 					if (data & 0x40) {
-						fg = &spectrum_colors[13 + spectrum.css * 2];	/* inverse */
-						bg = &spectrum_colors[12 + spectrum.css * 2];	/* inverse */
+						fg = spectrum_colors[13 + spectrum.css * 2];	/* inverse */
+						bg = spectrum_colors[12 + spectrum.css * 2];	/* inverse */
 					}
 					else {
-						fg = &spectrum_colors[12 + spectrum.css * 2];
-						bg = &spectrum_colors[13 + spectrum.css * 2];
+						fg = spectrum_colors[12 + spectrum.css * 2];
+						bg = spectrum_colors[13 + spectrum.css * 2];
 					}
 					i = ((scanline - border) % 24) / 2;
 					draw_pattern(fb_video_device, border + col * pwidth, scanline, 2, spectrum_fontdata8x12[char_code * 12 + i], fg, bg); 
 				}
 			}
 			if ((scanline - border + 1) % pheight) *addr = row_addr;
-			fill_rect(fb_video_device, HSIZE + border , scanline, border, 1, &spectrum_colors[8]);
+			fill_rect(fb_video_device, HSIZE + border , scanline, border, 1, spectrum_colors[8]);
 		}
 		break;
 	default:	/* graphics */
@@ -433,17 +433,17 @@ static void draw_scanline(int scanline, WORD *addr)
 		pheight = VSIZE / num_rows;
 
 		if ((scanline < border) || (scanline >= VSIZE+border))
-			fill_rect(fb_video_device, 0, scanline, HSIZE + border * 2, 1, &spectrum_colors[9 + spectrum.css * 2]);
+			fill_rect(fb_video_device, 0, scanline, HSIZE + border * 2, 1, spectrum_colors[9 + spectrum.css * 2]);
 		else {
-			fill_rect(fb_video_device, 0, scanline, border, 1, &spectrum_colors[9 + spectrum.css * 2]);
+			fill_rect(fb_video_device, 0, scanline, border, 1, spectrum_colors[9 + spectrum.css * 2]);
 			row_addr = *addr;
 			if ((spectrum.mode == RG6) && spectrum_artifacts && spectrum.css) {
 				/* 256 x 192 black & white with artifacts */
 				pwidth = 8;
 				for (col=0; col<32; col++) {
 					data = dma_read((*addr)++);
-					fill_rect(fb_video_device, border + col * pwidth * 2, scanline, pwidth, 1, &spectrum_colors[(16 + ((data & 0xf0) >> 4))]);
-					fill_rect(fb_video_device, border + col * pwidth * 2 + pwidth, scanline, pwidth, 1, &spectrum_colors[16 + (data & 0xf)]);
+					fill_rect(fb_video_device, border + col * pwidth * 2, scanline, pwidth, 1, spectrum_colors[(16 + ((data & 0xf0) >> 4))]);
+					fill_rect(fb_video_device, border + col * pwidth * 2 + pwidth, scanline, pwidth, 1, spectrum_colors[16 + (data & 0xf)]);
 				}
 			}
 			else {
@@ -451,20 +451,20 @@ static void draw_scanline(int scanline, WORD *addr)
 					if (num_colors == 2) {
 						if (col % 8 == 0) data = dma_read((*addr)++);
 						if (data & 0x80)
-							fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth, 1, &spectrum_colors[spectrum.css * 4]);
+							fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth, 1, spectrum_colors[spectrum.css * 4]);
 						else
-							fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth, 1, &spectrum_colors[8]);
+							fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth, 1, spectrum_colors[8]);
 						data <<= 1;
 					}
 					else if (num_colors == 4) {
 						if (col % 4 == 0) data = dma_read((*addr)++);
-						fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth, 1, &spectrum_colors[((data & 0xc0) >> 6) + (spectrum.css * 4)]);
+						fill_rect(fb_video_device, border + col * pwidth, scanline, pwidth, 1, spectrum_colors[((data & 0xc0) >> 6) + (spectrum.css * 4)]);
 						data <<= 2;
 					}
 				}
 			}
 			if ((scanline - border + 1) % pheight) *addr = row_addr;
-			fill_rect(fb_video_device, HSIZE + border , scanline, border, 1, &spectrum_colors[9 + spectrum.css * 2]);
+			fill_rect(fb_video_device, HSIZE + border , scanline, border, 1, spectrum_colors[9 + spectrum.css * 2]);
 		}
 	}
 }
@@ -575,10 +575,10 @@ void compupro_spectrum_off(void)
 		fb_video_off(fb_video_device);
 	fb_video_device = -1;
 
-	double delta = (get_clock_us() - start_time) / 1000000.0;
-
-	if (spectrum_stats)
+	if (spectrum_stats) {
+		double delta = (get_clock_us() - start_time) / 1000000.0;
 		printf("Spectrum: delta=%fs, frames/s=%f\r\n", delta, frames / delta);
+	}
 }
 
 /*

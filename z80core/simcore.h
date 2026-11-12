@@ -29,12 +29,8 @@ extern void start_bus_request(BusDMA_t mode, BusDMAFunc_t *bus_master);
 extern void end_bus_request(void);
 
 #ifdef CPU_TIMER
-extern Tstates_t cpu_timer_value;
-extern void (*cpu_timer_callback)(void *user_data);
-extern void *cpu_timer_user_data;
-extern int cpu_timer_priotity;
-
 #define MAX_CPU_TIMER	16
+extern int cpu_timer_count;
 extern void init_cpu_timer();
 extern int register_cpu_timer(int priority, void (*callback)(void *user_data), void *user_data);
 extern int unregister_cpu_timer(int timer_id);

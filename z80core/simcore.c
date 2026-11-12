@@ -394,6 +394,8 @@ typedef struct {
 	void *user_data;			/* pointer to user data (NULL = no user data) */
 } CPU_Timer;
 
+int cpu_timer_count = 0;			/* number of registered timers */
+
 static CPU_Timer cpu_timer[MAX_CPU_TIMER];	/* the timer slots */
 static int cpu_timer_queue[MAX_CPU_TIMER];	/* an ordered list of the timers for prioritization */
 
@@ -449,6 +451,7 @@ int register_cpu_timer(int priority, void (*callback)(void *user_data), void *us
 	}
 	if (i == MAX_CPU_TIMER) return -1;
 	cpu_timer_queue[i] = timer_id;
+	cpu_timer_count++;
 	
 	return timer_id;
 }
@@ -479,6 +482,7 @@ int unregister_cpu_timer(int timer_id)
 			break;
 		}
 	}
+	cpu_timer_count--;
 
 	return 0;
 }

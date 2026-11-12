@@ -23,7 +23,8 @@
 	-----------
 	
 	Everything specific to the emulated device should be implemented in
-	a dedicated device module.
+	a dedicated device module (e.g. one module for the TV Dazzler,
+	another for the Cromemco Spectrum and so on).
 	
 	Emulation of the device's state machine and the rendering on the
 	local system are decoupled, so that the state machine can run in-sync
@@ -41,47 +42,48 @@
 	the X server.
 
 	For Dazzler emulation, in total three different client-based rendering
-	methods are supported, two rendering methods (Surface and Texture) are
-	supported with SDL2, plus XImage based rendering for vanilla X11.
-
-	Surface rendering is the fastest drawing method for bitblit operations
-	with SDL2 as used with the Dazzler emulation, whereas rendering based
-	on Textures is in general more flexible. It can utilize the full range
-	of rendering features supported by SDL2 (e.g. free scaling or hardware
-	acceleration), but with overall slightly lower performance for bitblit
-	operations.
+	methods are supported, two rendering methods based on SDL2 (Surface and
+	Texture), plus XImage based rendering for vanilla X11.
 	
-	The fastest rendering with lowest overhead, however, can be achieved
-	by directly writing to XImage bitmaps. Free scaling won't be supported
-	by X11, but can be done	without performance tradeoffs by using the
-	X Rendering Extension (if supported by the X Server).
+	SDL2 in general provides the better integration for utilizing
+	accelerated graphics hardware, and offers more comprehensive support
+	such as audio and game controllers. SDL2 comes with two alternative
+	rendering methods: Surface and Texture rendering.
+
+	Surface rendering is a fast drawing method for bitblit operations
+	with SDL2 (as used with the z80pack emulation), whereas rendering based
+	on Textures utilizes the full range of rendering options provided by
+	the GPU, (e.g. scaling, rotating etc.), but with overall slightly lower
+	performance for bitblit operations.
+	
+	Fast rendering for native X11 can be implemented by writing directly to
+	XImage bitmaps. Any transformation, however - such as scaling - needs
+	to be done in software by the CPU, unless theX Rendering Extension is
+	supported by the X server.
 	
 	If neither Texture based rendering is used, nor the X Rendering
-	Extension is available,	scaling can be performed within the client,
-	passing over the scaled image to the X Server.
+	Extension is available,	scaling can still be performed by software
+	within the client, passing over the scaled image to the X Server.
 	
-	Webserver
-	---------
+	Web UI
+	------
 	
 	The z80pack emulation can be run in webserver mode, where no rendering
 	is done on the local display, but rather a web interface is provided
-	with a desktop holding a complete S100 computer environment, including
-	the Dazzler display. The desktop is accessable from a web browser via
+	with a desktop mimiking a complete S100 computer environment, including
+	a Dazzler display. The desktop is accessable from a web browser via
 	localhost:8080.
 	
-	This implementation will serve the z80pack web interface, but relevant
-	portions of the Dazzler rendering are hidden inside a Javascript engine,
-	so no synchronization is possible with the renderer. Consequently,
-	certain features like tweaking or interlaced display are not available
-	with the web desktop. Generating the information in the flags register
-	will still be accurate, so that some Dazzler programs using this
-	information will work, which will not run otherwise.
+	Within the web UI, relevant portions of the Dazzler rendering are hidden
+	inside a Javascript engine, which limits emulation to just rendering
+	the video buffer and implementing the flags register, without hardware
+	tweaks or interlaced video.
 
 	TODOs
 	-----
 
 	Because of the many supported options, and the corresponding
-	conditional compliles, the code becomes a bit hard to read. I'll
+	conditional compiles, the code becomes a bit hard to read. I'll
 	try to reduce it to the options which work out best or try to make
 	an automatic selection in the future.
 	
@@ -89,14 +91,14 @@
 	generic X11 implementation can be way more performant, even if
 	intrinsic GPU support for scaling is substituted by a software scaler.
 
-	The main advantage of SDL is compatibility across non-X11 platforms
-	such as MS Windows, which in fact is not an option with z80pack anyway.
+	The general advantage of SDL is being widely OS agnostic, which means
+	portability as long as the framework is being installed.
 */
 
 /* SDL rendering options */
 #define SURFACE	(0)			/* fastest rendering option */
 #define TEXTURE (1)			/* still fast, and can scale freely */
-#define SDL_RENDER_MODE SURFACE		/* define to either SURFACE or TEXTURE */
+#define SDL_RENDER_MODE TEXTURE		/* define to either SURFACE or TEXTURE */
 #define BUSMASTER			/* define to simulate busmaster operation for Dazzler DMA */
 
 #include <stdio.h>
@@ -193,6 +195,7 @@ typedef struct _fbvideo {
 #else /* !WANT_SDL */
 
 	/* X11 specific */
+	Display *display;
 	BYTE *canvas, *scaled_canvas;
 	XRenderPictFormat *pict_format;
 	XImage *ximage, *scaled_ximage;
@@ -209,6 +212,7 @@ typedef struct _fbvideo {
 
 #endif /* !WANT_SDL */
 
+	int handle;
 #if !defined(WANT_SDL) || defined(HAS_NETSERVER)
 	pthread_t thread;
 #endif
@@ -223,13 +227,10 @@ static void ws_clear(int device_handle);
 static FBVideo fb_video_devices[MAX_NUM_DEVICES];
 static int num_devices = 0;
 static uint32_t used_devices = 0;
-static int open_handle;
 
 #ifdef WANT_SDL
 /*
  *	Create the SDL window
- *
- *	Set open_handle appropriately before calling this function
  */
 static void open_window(int device_handle)
 {
@@ -306,15 +307,15 @@ static void close_window(int device_handle)
 
 #else /* !WANT_SDL */
 
-static Display *display = NULL;			/* used by all X11 fb_video windows */
+//static Display *display = NULL;			/* used by all X11 fb_video windows */
 static bool has_xrender_extension = false;	/* set after display setup */
 
 /*
  *	Create the X11 window
  */
-static void open_window(int device_handle)
+static int open_window(int device_handle)
 {
-	if (device_handle < 0) return;
+	if (device_handle < 0) return -1;
 
 	FBVideo *dev = &fb_video_devices[device_handle];
 	
@@ -326,47 +327,44 @@ static void open_window(int device_handle)
 
 	XSizeHints *size_hints = XAllocSizeHints();
     	int first_event, first_error, screen;
-	
-	if (display == NULL) {
-		display = XOpenDisplay(NULL);
-		if (display == NULL) {
-			LOGE(TAG, "Could not open display, please ensure X Server is running and DISPLAY is set\n\r");
-			return;
-		}
-		has_xrender_extension = XRenderQueryExtension(display, &first_event, &first_error);
+
+	/* for avoiding the locking hassle with multiple threads, we assign each window its own connection */
+	dev->display = XOpenDisplay(NULL);
+	if (dev->display == NULL) {
+		LOGE(TAG, "Could not open display, please ensure X Server is running and DISPLAY is set\n\r");
+		return -1;
 	}
+	has_xrender_extension = XRenderQueryExtension(dev->display, &first_event, &first_error);
 
-	XLockDisplay(display);
-	screen = DefaultScreen(display);
-	dev->rootwindow = RootWindow(display, screen);
-	XGetWindowAttributes(display, dev->rootwindow, &dev->wa);
-	dev->window = XCreateSimpleWindow(display, dev->rootwindow, 0, 0,
+	screen = DefaultScreen(dev->display);
+	dev->rootwindow = RootWindow(dev->display, screen);
+	XGetWindowAttributes(dev->display, dev->rootwindow, &dev->wa);
+	dev->window = XCreateSimpleWindow(dev->display, dev->rootwindow, 0, 0,
 				     width, height, 1, 0, 0);
-	XStoreName(display, dev->window, dev->title);
+	XStoreName(dev->display, dev->window, dev->title);
 
-	dev->wm_focused = XInternAtom(display, "_NET_WM_STATE_FOCUSED", 0);
-    	dev->wm_maxhorz = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", 0);
-    	dev->wm_maxvert = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", 0);
-    	dev->wm_hidden = XInternAtom(display, "_NET_WM_STATE_HIDDEN", 0);		
-	dev->wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
-	XSetWMProtocols(display, dev->window, &dev->wm_delete_window, 1);
+	dev->wm_focused = XInternAtom(dev->display, "_NET_WM_STATE_FOCUSED", 0);
+    	dev->wm_maxhorz = XInternAtom(dev->display, "_NET_WM_STATE_MAXIMIZED_HORZ", 0);
+    	dev->wm_maxvert = XInternAtom(dev->display, "_NET_WM_STATE_MAXIMIZED_VERT", 0);
+    	dev->wm_hidden = XInternAtom(dev->display, "_NET_WM_STATE_HIDDEN", 0);		
+	dev->wm_delete_window = XInternAtom(dev->display, "WM_DELETE_WINDOW", False);
+	XSetWMProtocols(dev->display, dev->window, &dev->wm_delete_window, 1);
 	
-	XSelectInput(display, dev->window, StructureNotifyMask | PropertyChangeMask);
+	XSelectInput(dev->display, dev->window, StructureNotifyMask | PropertyChangeMask);
 
-	dev->gc = XCreateGC(display, dev->window, 0, NULL);
+	dev->gc = XCreateGC(dev->display, dev->window, 0, NULL);
 	
 	/* Create an XImage structure that points to our buffer */
-    	XMatchVisualInfo(display, screen, 24, TrueColor, &dev->vinfo);
+    	XMatchVisualInfo(dev->display, screen, 24, TrueColor, &dev->vinfo);
     	dev->canvas = malloc(width * height * 4);
-        dev->ximage = XCreateImage(display, dev->vinfo.visual, 24, ZPixmap, 0, (char *)dev->canvas,
+        dev->ximage = XCreateImage(dev->display, dev->vinfo.visual, 24, ZPixmap, 0, (char *)dev->canvas,
                                   width, height, 32, 0);
-#if 1
 	/* XRenderExtension stuff */
     	if (has_xrender_extension) {
-		dev->pict_format = XRenderFindVisualFormat(display, DefaultVisual(display, screen));
-		dev->window_pic = XRenderCreatePicture(display, dev->window, dev->pict_format, 0, NULL);
-		dev->pixmap = XCreatePixmap(display, dev->window, width, height, dev->wa.depth);
-		dev->canvas_pic = XRenderCreatePicture(display, dev->pixmap, dev->pict_format, 0, NULL);
+		dev->pict_format = XRenderFindVisualFormat(dev->display, DefaultVisual(dev->display, screen));
+		dev->window_pic = XRenderCreatePicture(dev->display, dev->window, dev->pict_format, 0, NULL);
+		dev->pixmap = XCreatePixmap(dev->display, dev->window, width, height, dev->wa.depth);
+		dev->canvas_pic = XRenderCreatePicture(dev->display, dev->pixmap, dev->pict_format, 0, NULL);
 		dev->transform.matrix[0][0] = XDoubleToFixed(1);
 		dev->transform.matrix[0][1] = XDoubleToFixed(0);
 		dev->transform.matrix[0][2] = XDoubleToFixed(0);
@@ -377,7 +375,6 @@ static void open_window(int device_handle)
 		dev->transform.matrix[2][1] = XDoubleToFixed(0);
 		dev->transform.matrix[2][2] = XDoubleToFixed(1);					
 	}
-#endif
 
 	/* size hints */
 	size_hints->flags = PSize | PMinSize | PAspect;
@@ -390,11 +387,10 @@ static void open_window(int device_handle)
 	size_hints->max_aspect.x = width;
 	size_hints->max_aspect.y = height;
 
-	XSetWMNormalHints(display, dev->window, size_hints);
+	XSetWMNormalHints(dev->display, dev->window, size_hints);
 	XFree(size_hints);
 
-	XMapWindow(display, dev->window);
-	XUnlockDisplay(display);
+	XMapWindow(dev->display, dev->window);
 
 #ifdef CPU_TIMER
 	if (dev->timer_id < 0) {
@@ -402,13 +398,15 @@ static void open_window(int device_handle)
 		dev->timer_id = register_cpu_timer(0, dev->callback, dev->user_data);
 		if (dev->timer_id < 0) {
 			LOGE(TAG, "Unable to allocate CPU timer (all slots in use)\n");
-			return;
+			return -1;
 		}
 	}
 
 	/* start timer */
 	set_cpu_timer(dev->timer_id, 1);
 #endif /* CPU_TIMER */
+
+	return 0;
 }
 
 /*
@@ -416,26 +414,23 @@ static void open_window(int device_handle)
  */
 static void close_window(int device_handle)
 {
-	if ((device_handle < 0) || (display == NULL)) return;
+	if (device_handle < 0) return;
 
 	FBVideo *dev = &fb_video_devices[device_handle];
+	
+	if (dev->display == NULL) return;
 
-	XLockDisplay(display);
 	XDestroyImage(dev->ximage);
 	if (dev->scaled_ximage) {
 		XDestroyImage(dev->scaled_ximage);
 	}
 	if (has_xrender_extension) {
-		XFreePixmap(display, dev->pixmap);
+//		XFreePixmap(dev->display, dev->pixmap);
 	}
-	XFreeGC(display, dev->gc);
-	XDestroyWindow(display, dev->window);
-	XUnlockDisplay(display);
-
-	if (num_devices == 1) {
-		XCloseDisplay(display);
-		display = NULL;
-	}
+	XFreeGC(dev->display, dev->gc);
+	XDestroyWindow(dev->display, dev->window);
+	XCloseDisplay(dev->display);
+	dev->display = NULL;
 }
 
 #endif /* !WANT_SDL */
@@ -451,7 +446,8 @@ static void kill_thread(int device_handle)
 	FBVideo *dev = &fb_video_devices[device_handle];
 
 	if (dev->thread != 0) {
-		sleep_for_ms(50);
+		sleep_for_ms(50);	/* sleep required for clean termination */
+
 		pthread_cancel(dev->thread);
 		pthread_join(dev->thread, NULL);
 		dev->thread = 0;
@@ -469,6 +465,8 @@ void fb_video_show(int device_handle)
 	FBVideo *dev = &fb_video_devices[device_handle];
 	
 	dev->state = true;
+	dev->frames = 0;
+	dev->start_time = get_clock_us();
 
 #ifdef HAS_NETSERVER
 	if (n_flag)
@@ -479,7 +477,7 @@ void fb_video_show(int device_handle)
 #ifdef WANT_SDL
 		SDL_ShowWindow(dev->window);
 #else
-		XMapWindow(display, dev->window);
+		XMapWindow(dev->display, dev->window);
 #endif /* !WANT_SDL */
 
 #ifdef CPU_TIMER
@@ -511,7 +509,7 @@ void fb_video_hide(int device_handle)
 #ifdef WANT_SDL
 		SDL_HideWindow(dev->window);
 #else
-		XUnmapWindow(display, dev->window);
+		XUnmapWindow(dev->display, dev->window);
 #endif /* !WANT_SDL */
 
 	if (dev->stats) {
@@ -612,76 +610,63 @@ static void process_event(int device_handle, SDL_Event *event)
 /*
  *	Draw rectangle for SDL with current foreground
  */
-inline void fill_rect(int device_handle, int x, int y, int w, int h, uint8_t (*fg)[3])
+inline void fill_rect(int device_handle, int x, int y, int w, int h, Uint32 fg)
 {
-	if (device_handle < 0) return;
+    if (device_handle < 0) return;
+    	
+    const FBVideo *dev = &fb_video_devices[device_handle];
+    
+    int i,j,x_max,y_max;
 
-	FBVideo *dev = &fb_video_devices[device_handle];
+    /* try to catch surface re-allocation caused by concurrent window resize */
+    if (dev->window_resized) return;
 
-	/* try to catch surface re-allocation caused by concurrent window resize */
-	if (dev->window_resized) return;
+    x_max = x + w;
+    y_max = y + h;
 
-	register int i,j,x_max,y_max;
-	register Uint32 fg_color;
+    if (x_max > dev->canvas_width) x_max = dev->canvas_width;
+    if (y_max > dev->canvas_height) y_max = dev->canvas_height;
+    	
+#if SDL_RENDER_MODE == TEXTURE
+    const Uint32 fg_RGBA = fg << 8 | 0xff;
+#endif
 
+    for (j = y; j < y_max; j++) {
+       	for (i = x; i < x_max; i++) {
 #if SDL_RENDER_MODE == SURFACE
-	fg_color = SDL_MapRGB(dev->surface->format, (*fg)[0], (*fg)[1], (*fg)[2]);
+       		dev->canvas[(j * dev->surface->w) + i] = fg;
 #elif SDL_RENDER_MODE == TEXTURE
-	fg_color = (*fg)[0] << 24 | (*fg)[1] << 16 | (*fg)[2] << 8 | 0xff;
-#endif /* SDL_RENDER_MODE */
-
-	x_max = x + w;
-	y_max = y + h;
-	if (x_max > dev->canvas_width) x_max = dev->canvas_width;
-	if (y_max > dev->canvas_height) y_max = dev->canvas_height;
-
-	for (j = y; j < y_max; j++) {
-        	for (i = x; i < x_max; i++) {
-#if SDL_RENDER_MODE == SURFACE
-        		dev->canvas[(j * dev->surface->w) + i] = fg_color;
-#elif SDL_RENDER_MODE == TEXTURE
-        		dev->canvas[(j * dev->pitch) + i] = fg_color;
+       		dev->canvas[(j * dev->pitch) + i] = fg_RGBA;
 #endif /* RENDER_MODE*/
-        	}
-        }
-}	
+       	}
+    }
+}
 
 /*
  *	Draw an 8-bit pattern for SDL on a horizontal line with foreground & background
  */
-inline void draw_pattern(int device_handle, int x, int y, int psize, uint8_t data, uint8_t (*fg)[3], uint8_t (*bg)[3])
+inline void draw_pattern(int device_handle, int x, int y, int psize, uint8_t data, Uint32 fg, Uint32 bg)
 {
-	if (device_handle < 0) return;
-
-	FBVideo *dev = &fb_video_devices[device_handle];
-
-	register int i, bit, mask;
-	register long offset;
-	register Uint32 fg_color, bg_color;
+    if (device_handle < 0) return;
+    
+    const FBVideo *dev = &fb_video_devices[device_handle];
+    
+    Uint32 *__restrict__ buffer;
+    
+    const Uint32 colors[2] = { bg, fg };
 
 #if SDL_RENDER_MODE == SURFACE
-	fg_color = SDL_MapRGB(dev->surface->format, (*fg)[0], (*fg)[1], (*fg)[2]);
-	bg_color = SDL_MapRGB(dev->surface->format, (*bg)[0], (*bg)[1], (*bg)[2]);
+    buffer =  (Uint32 *)dev->canvas + (y * dev->surface->w) + x;
 #elif SDL_RENDER_MODE == TEXTURE
-	fg_color = (*fg)[0] << 24 | (*fg)[1] << 16 | (*fg)[2] << 8 | 0xff;
-	bg_color = (*bg)[0] << 24 | (*bg)[1] << 16 | (*bg)[2] << 8 | 0xff;
-#endif /* SDL_RENDER_MODE */
+    buffer =  (Uint32 *)dev->canvas + (y * dev->pitch) + x;
+#endif /* RENDER_MODE */
 
-	mask = 0x80;
-	offset = ((y * dev->canvas_width) + x);
-	for (bit=0; bit<8; bit++) {
-		if (data & mask) {
-			for (i=0; i<psize; i++) {
-				dev->canvas[offset++] = fg_color;
-			}
-		}
-		else {
-			for (i=0; i<psize; i++) {
-				dev->canvas[offset++] = bg_color;
-			}
-		}
-		mask >>= 1;
-	}
+    for (int bit = 7; bit >= 0; --bit) {
+        Uint32 c = colors[(data >> bit) & 1];
+        for (int i = 0; i < psize; ++i) {
+            *buffer++ = c;
+        }
+    }
 }
 
 #else /* !WANT_SDL */
@@ -701,14 +686,14 @@ static void process_event(int device_handle, int *ret_width, int *ret_height)
 	unsigned long nitems, bytes_after;
 	unsigned char *dp;
 
-	while(XCheckTypedWindowEvent(display, dev->window, ClientMessage, &event)) {
+	while(XCheckTypedWindowEvent(dev->display, dev->window, ClientMessage, &event)) {
             if (((Atom*)event.xclient.data.l)[0] == dev->wm_delete_window) {
 		// do whatever should be done when window gets closed by user
 		break;
             }
         }
 
-	while (XCheckWindowEvent(display, dev->window, StructureNotifyMask | PropertyChangeMask, &event)) {
+	while (XCheckWindowEvent(dev->display, dev->window, StructureNotifyMask | PropertyChangeMask, &event)) {
 		switch(event.type) {
 		case ConfigureNotify:
 			/* check for window resize event */
@@ -722,14 +707,14 @@ static void process_event(int device_handle, int *ret_width, int *ret_height)
 		case PropertyNotify:
 			/* grant WSLg some time to process */
 			sleep_for_ms(1);
-			if (!strcmp(XGetAtomName(display, event.xproperty.atom), "_NET_WM_STATE")) {
-	                    status = XGetWindowProperty(display, dev->window, event.xproperty.atom, 0L, 1L, 0, 4,
+			if (!strcmp(XGetAtomName(dev->display, event.xproperty.atom), "_NET_WM_STATE")) {
+	                    status = XGetWindowProperty(dev->display, dev->window, event.xproperty.atom, 0L, 1L, 0, 4,
 	                    				&actual_type, &actual_format, &nitems, &bytes_after, &dp);
 	                    if ((status == Success) && (actual_type == 4) && dp && (actual_format == 32) && nitems) {
 	                        for (unsigned int i = 0; i < nitems; i++) {
 	                            prop = (((Atom*)dp)[i]);
 	                            if ((prop == dev->wm_focused) || (prop == dev->wm_maxhorz) || (prop == dev->wm_maxvert)) {
-					XGetWindowAttributes(display, dev->window, &dev->wa);
+					XGetWindowAttributes(dev->display, dev->window, &dev->wa);
 					*ret_width = dev->wa.width;
 					*ret_height = dev->wa.height;
 					dev->window_resized = true;
@@ -746,66 +731,46 @@ static void process_event(int device_handle, int *ret_width, int *ret_height)
 /*
  *	Fill rectangle for X11 with foreground color
  */
-inline void fill_rect(int device_handle, int x, int y, int w, int h, uint8_t (*fg)[3])
+inline void fill_rect(int device_handle, int x, int y, int w, int h, uint32_t fg)
 {
-	if (device_handle < 0) return;
-
-	FBVideo *dev = &fb_video_devices[device_handle];
-
-	register int i,j,y_max;
-//	register uint32_t *buffer;
-	long offset;
+    if (device_handle < 0) return;
     
-	y_max = y + h;
-	if (y_max > dev->canvas_height) y_max = dev->canvas_height;
-		
-	for (j = y; j < y_max; j++) {
-//		buffer = (uint32_t *)dev->canvas + (j * dev->canvas_width) + x;
-//		for (i=0; i<w; i++) *buffer++ = fg;
-		offset = ((j * dev->canvas_width) + x) *4;
-		for (i=0; i<w; i++) {
-			dev->canvas[offset++] = (*fg)[2];
-			dev->canvas[offset++] = (*fg)[1];
-			dev->canvas[offset++] = (*fg)[0];
-			dev->canvas[offset++] = 0xff;
-		}
-	}
+    const FBVideo *dev = &fb_video_devices[device_handle];
+    
+    int i,j,x_max,y_max;
+    uint32_t *__restrict__ buffer;
+
+    x_max = x + w;
+    y_max = y + h;
+    
+    if (x_max > dev->canvas_width) x_max = dev->canvas_width;
+    if (y_max > dev->canvas_height) y_max = dev->canvas_height;
+    	
+    for (j = y; j < y_max; j++) {
+    	buffer =  (uint32_t *)dev->canvas + (j * dev->canvas_width) + x;
+    	for (i=0; i<w; i++) *buffer++ = fg;
+    }
 }
 
 /*
  *	Draw an 8-bit pattern for X11 on a horizontal line with foreground & background
  */
-inline void draw_pattern(int device_handle, int x, int y, int psize, uint8_t data, uint8_t (*fg)[3], uint8_t (*bg)[3])
+inline void draw_pattern(int device_handle, int x, int y, int psize, uint8_t data, uint32_t fg, uint32_t bg)
 {
-	if (device_handle < 0) return;
+    if (device_handle < 0) return;
 
-	FBVideo *dev = &fb_video_devices[device_handle];
+    const FBVideo *dev = &fb_video_devices[device_handle];
 
-	register int i, bit, mask;
-	long offset;
+    const uint32_t colors[2] = { bg, fg };
 
-	mask = 0x80;
-	offset = ((y * dev->canvas_width) + x) * 4;
-	for (bit=0; bit<8; bit++) {
-		if (data & mask) {
-			for (i=0; i<psize; i++) {
-				dev->canvas[offset++] = (*fg)[2];
-				dev->canvas[offset++] = (*fg)[1];
-				dev->canvas[offset++] = (*fg)[0];
-				dev->canvas[offset++] = 0xff;
-			}
-		}
-		else {
-//			for (i=0; i<psize; i++) *buffer++ = bg;
-			for (i=0; i<psize; i++) {
-				dev->canvas[offset++] = (*bg)[2];
-				dev->canvas[offset++] = (*bg)[1];
-				dev->canvas[offset++] = (*bg)[0];
-				dev->canvas[offset++] = 0xff;
-			}
-		}
-		mask >>= 1;
-	}
+    uint32_t *__restrict__ buffer = (uint32_t *)dev->canvas + ((size_t)y * dev->canvas_width) + x;
+
+    for (int bit = 7; bit >= 0; --bit) {
+        uint32_t c = colors[(data >> bit) & 1];
+        for (int i = 0; i < psize; ++i) {
+            *buffer++ = c;
+        }
+    }
 }
 
 /*
@@ -973,14 +938,13 @@ static client_funcs2_t fb_video_funcs = {
 #endif /* WANT_SDL */
 
 #if !defined(WANT_SDL) || defined(HAS_NETSERVER)
-
 /*
  *	Thread for updating the X11 display or web server
  */
 static void *update_thread(void *arg)
 {
 	int device_handle = *((int *)arg);
-
+	
 	if (device_handle < 0) pthread_exit(NULL);
 
 	FBVideo *dev = &fb_video_devices[device_handle];
@@ -995,7 +959,7 @@ static void *update_thread(void *arg)
 #endif /* HAS_NETSERVER */
 #ifndef WANT_SDL
 			/* handle window events */
-			process_event(device_handle, &dev->window_width, &dev->window_height);
+			process_event(dev->handle, &dev->window_width, &dev->window_height);
 			
 			/* handle resize event */
 			if (dev->window_resized) {
@@ -1014,7 +978,7 @@ static void *update_thread(void *arg)
 				} else {
 					if (dev->scaled_ximage) XDestroyImage(dev->scaled_ximage);
 				    	dev->scaled_canvas = malloc(dev->window_width * dev->window_height * 4);
-				        dev->scaled_ximage = XCreateImage(display, dev->vinfo.visual,
+				        dev->scaled_ximage = XCreateImage(dev->display, dev->vinfo.visual,
 				        	24, ZPixmap, 0, (char *)dev->scaled_canvas,
 		                                dev->window_width, dev->window_height, 32, 0);
 				}
@@ -1056,33 +1020,32 @@ static void *update_thread(void *arg)
 
 				dev->frames++;
 
-				XLockDisplay(display);
 				if (has_xrender_extension) {
-					XPutImage(display, dev->pixmap, dev->gc, dev->ximage, 0, 0, 0, 0, dev->canvas_width, dev->canvas_height);
-					XRenderSetPictureFilter(display, dev->canvas_pic, FilterBilinear, NULL, 0);
-					XRenderSetPictureTransform(display, dev->canvas_pic, &dev->transform);
-				        XRenderComposite(display, PictOpSrc, dev->canvas_pic, 0, dev->window_pic,
+					XPutImage(dev->display, dev->pixmap, dev->gc, dev->ximage, 0, 0, 0, 0, dev->canvas_width, dev->canvas_height);
+					XRenderSetPictureFilter(dev->display, dev->canvas_pic, FilterBilinear, NULL, 0);
+					XRenderSetPictureTransform(dev->display, dev->canvas_pic, &dev->transform);
+				        XRenderComposite(dev->display, PictOpSrc, dev->canvas_pic, 0, dev->window_pic,
 				                         0, 0, 0, 0, 0, 0, dev->window_width, dev->window_height);
 				}
 				else {
 					if (dev->scaled_ximage) {
 						scale_ximage(dev->ximage, dev->scaled_ximage);
-						XPutImage(display, dev->window, dev->gc, dev->scaled_ximage, 0, 0, 0, 0, dev->window_width, dev->window_height);
+						XPutImage(dev->display, dev->window, dev->gc, dev->scaled_ximage, 0, 0, 0, 0, dev->window_width, dev->window_height);
 					}
 					else {
-						XPutImage(display, dev->window, dev->gc, dev->ximage, 0, 0, 0, 0, dev->canvas_width, dev->canvas_height);
+						XPutImage(dev->display, dev->window, dev->gc, dev->ximage, 0, 0, 0, 0, dev->canvas_width, dev->canvas_height);
 					}
 				}
-				XUnlockDisplay(display);
 #endif /* !WANT_SDL */
 #ifdef HAS_NETSERVER
 			} else {
-				ws_refresh(device_handle);
+				ws_refresh(dev->handle);
 			}
 #endif /* HAS_NETSERVER */
+			sleep_for_ms(1);			/* don't take it all.. also works as thread cancellation point */
 		}
 		else {
-			sleep_for_us(dev->vscan_period);
+			sleep_for_us(dev->vscan_period);	/* even with inactive rendering, we still want proper sync timimng */
 		}
 	}
 
@@ -1126,6 +1089,7 @@ int fb_video_init(
 	num_devices++;
 	FBVideo *dev = &fb_video_devices[device_handle];
 
+	dev->handle = device_handle;
 	dev->canvas_width = width;
 	dev->canvas_height = height;
 	dev->stats = stats;
@@ -1155,16 +1119,13 @@ int fb_video_init(
 	dev->start_time = get_clock_us();
 	dev->timer_id = -1;
 
-	open_handle = device_handle;	// we need to make the handle persistent in case creating a thread takes longer
-
 #ifdef HAS_NETSERVER
 	if (!n_flag) {
 #endif
 #ifdef WANT_SDL
 		dev->client_id = simsdl_create2(device_handle, &fb_video_funcs);
 #else
-		open_window(device_handle);
-		if (display == NULL) return -1;
+		if (open_window(device_handle) < 0) return -1;
 #endif
 #ifdef HAS_NETSERVER
 	} else {
@@ -1176,7 +1137,7 @@ int fb_video_init(
 	if (n_flag) {
 #endif
 #if !defined(WANT_SDL) || defined(HAS_NETSERVER)
-		if (pthread_create(&dev->thread, NULL, update_thread, &open_handle)) {
+		if (pthread_create(&dev->thread, NULL, update_thread, &dev->handle)) {
 			LOGE(TAG, "can't create thread");
 			return -1;
 		}
@@ -1187,6 +1148,8 @@ int fb_video_init(
 	if (ret_vblank) *ret_vblank = &dev->vblank;
 	if (ret_field) *ret_field = &dev->field;
 	if (ret_timer_id) *ret_timer_id = &dev->timer_id;
+
+	sleep_for_ms(10);
 
 	return device_handle;
 }

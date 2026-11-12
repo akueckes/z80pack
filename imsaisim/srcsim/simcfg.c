@@ -437,8 +437,6 @@ void config(void)
 				noisemaker_sample_rate = strtol(t2, NULL, 0);
 			} else if (!strcmp(t1, "noisemaker_buffer_size")) {
 				noisemaker_buffer_size = strtol(t2, NULL, 0);
-			} else if (!strcmp(t1, "noisemaker_sync_adjust")) {
-				noisemaker_sync_adjust = atof(t2);
 			} else if (!strcmp(t1, "noisemaker_recording_limit")) {
 				noisemaker_recording_limit = strtol(t2, NULL, 0);
 			} else if (!strcmp(t1, "noisemaker_soundfile")) {
@@ -447,13 +445,13 @@ void config(void)
 				*s = 0;
 #endif
 #ifdef HAS_VECTOR_GRAPHIC_HIRES
-			} else if (!strcmp(t1, "vector_graphic_hires_mode")) {
-				if (!strncmp(t2, "bilevel", 7)) vector_graphic_hires_mode = 0;
-				else if (!strncmp(t2, "gradient", 8)) vector_graphic_hires_mode = 1;
+			} else if (!strcmp(t1, "hires_mode")) {
+				if (!strncmp(t2, "bilevel", 7)) hires_mode = 0;
+				else if (!strncmp(t2, "gradient", 8)) hires_mode = 1;
 				else LOGW(TAG, "invalid value for %s: %s", t1, t2);
-			} else if (!strcmp(t1, "vector_graphic_hires_address")) {
-				vector_graphic_hires_address = strtol(t2, NULL, 0);
-			} else if (!strcmp(t1, "vector_graphic_hires_fg")) {
+			} else if (!strcmp(t1, "hires_address")) {
+				hires_address = strtol(t2, NULL, 0);
+			} else if (!strcmp(t1, "hires_fg")) {
 				if ((t3 = strtok(NULL, " \t,")) == NULL ||
 				    (t4 = strtok(NULL, " \t,")) == NULL) {
 					LOGW(TAG, "missing parameter for %s", t1);
@@ -474,9 +472,21 @@ void config(void)
 					LOGW(TAG, "invalid blue component %d", v3);
 					continue;
 				}
-				vector_graphic_hires_fg_color[0] = v1;
-				vector_graphic_hires_fg_color[1] = v2;
-				vector_graphic_hires_fg_color[2] = v3;
+				hires_fg_color[0] = v1;
+				hires_fg_color[1] = v2;
+				hires_fg_color[2] = v3;
+			} else if (!strcmp(t1, "hires_stats")) {
+				switch (*t2) {
+				case '0':
+					hires_stats = false;
+					break;
+				case '1':
+					hires_stats = true;
+					break;
+				default:
+					LOGW(TAG, "invalid value for %s: %s", t1, t2);
+					break;
+				}
 #endif
 #ifdef HAS_COMPUPRO_SPECTRUM
 			} else if (!strcmp(t1, "spectrum_address")) {

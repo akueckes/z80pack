@@ -29,20 +29,20 @@
 
 // #define LOG_LOCAL_LEVEL LOG_DEBUG
 #include "log.h"
-static const char *TAG = "MUISCBOARD";
+static const char *TAG = "Musicboard";
 
 #define PORT_COUNT  2
 
 #define DEFAULT_SAMPLE_RATE	22050		/* requested audio sample rate in Hz */
 #define DEFAULT_BUFFER_SIZE	64		/* requested audio buffer size in samples per channel, defines audio delay */
 //#define DEFAULT_SYNC_ADJUST	1.0247		/* default fine tuning for audio sync adjustment */
+#define DEFAULT_SYNC_ADJUST	1.0		/* default fine tuning for audio sync adjustment */
 #define DEFAULT_RECORDING_LIMIT 10000000	/* size of wave buffer for file output & debug purposes */
 
 /* parameters configurable in system.conf */
 unsigned long musicboard_sample_rate = DEFAULT_SAMPLE_RATE;
 unsigned long musicboard_buffer_size = DEFAULT_BUFFER_SIZE;
-//double musicboard_sync_adjust = DEFAULT_SYNC_ADJUST;
-double musicboard_sync_adjust = 0.0;
+double musicboard_sync_adjust = DEFAULT_SYNC_ADJUST;
 unsigned long musicboard_recording_limit = DEFAULT_RECORDING_LIMIT;
 char *musicboard_soundfile = NULL;
 bool musicboard_stats = false;
@@ -87,7 +87,7 @@ void newtech_musicboard_init(void)
     	LOG(TAG, "Music Board initialized and ready to use\n");
     }
     else {
-    	LOGE(TAG, "Failed to initialize Music Board\n");
+    	LOGE(TAG, "Failed to initialize audio subsystem");
     }
 }
 

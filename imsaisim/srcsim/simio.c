@@ -402,6 +402,10 @@ void exit_io(void)
 	/* shutdown D+7A */
 	cromemco_d7a_off();
 #endif
+#ifdef HAS_MUSICBOARD
+	/* shutdown Musicboard */
+	newtech_musicboard_off();
+#endif
 #ifdef HAS_NOISEMAKER
 	ads_noisemaker_off();
 #endif
