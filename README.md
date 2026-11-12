@@ -52,8 +52,24 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
   	- set **d7a_soundfile** as a string for the filename of the recording WAV file (also enables recording)
   	- set **d7a_recording_limit** as an integer for the maximum number of samples to limit the size of a recording
   	- set **d7a_stats** to 1 for printing some audio stats when shutting down the emulator (can be used for tuning the balance of buffer over- and underflows)
+	- set **d7a_axis_map** to re-map the axis of your game controller to the axis of the emulated joystick
+ 	- set **d7a_button_map** to re-map the buttons of your game controller to the buttons of the emulated joystick
  - audio and joystick/game controller support in Linux is not standardized, sometimes it works out of the box, sometimes it requires additional configurations. Especially game controller support might include rebuilding the kernel (this version of z80pack reports joysticks found during start-up of the emulation). Hint: check for files /dev/inputs/js* and /dev/inputs/event*. Also, passing through game controllers via WSL requires special handling.
  - some game controllers come with an integrated audio device, be aware that audio output might be routed to this device when being plugged in (no sound on all other devices). You might think about disabling the game controller's audio device.
+
+## Notes on Newtech Model 6 Music Board
+- define HAS_MUSICBOARD in the appropriate sim.h file to enable this emulation during build
+- can be configured to produce a WAV file as recording of an audio sequence
+- build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
+- alternatively, build z80pack with WANT_SDL=YES to use SDL2 framework for display, joysticks and sound
+- audio port 36 is mapped to the left audio channel on the first board, audio port 40 is mapped to the right audio channel on the second board
+- additional config settings in the system.conf file:
+	- set **musicboard_sample_rate** as an integer for the sampling rate of the audio framework in samples/second
+	- set **musicboard_sync_adjust** as a floating point number to adjust the sound buffer processing speed with a multiplier (in order to reach the optimum balance between buffer overflows and underflows), where a value of 1.0 means no change
+	- set **musicboard_buffer_size** as an integer for the size of the sample buffer in samples (limits the processing delay)
+  	- set **musicboard_soundfile** as a string for the filename of the recording WAV file (also enables recording)
+  	- set **musicboard_recording_limit** as an integer for the maximum number of samples to limit the size of a recording
+  	- set **musicboard_stats** to 1 for printing some audio stats when shutting down the emulator (can be used for tuning the balance of buffer over- and underflows)
 
 ## Notes on ADS Noisemaker
 - define HAS_NOISEMAKER in the appropriate sim.h file to enable this emulation during build
@@ -63,6 +79,7 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
 - alternatively, build z80pack with WANT_SDL=YES to use SDL2 framework for display, joysticks and sound
 - additional config settings in the system.conf file:
 	- set **noisemaker_sample_rate** as an integer for the sampling rate of the audio framework in samples/second
+	- set **noisemaker_buffer_size** as an integer for the buffer size requested from the audio subsystem
  	- set **noisemaker_soundfile** as a string for the filename of the recording WAV file (also enables recording)
 	- set **noisemaker_recording_limit** as an integer for the maximum number of samples to limit the size of a recording
 
