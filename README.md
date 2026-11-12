@@ -3,14 +3,14 @@
 z80pack is a mature emulator of multiple platforms with 8080 and Z80 CPU.
 
 This fork adds a couple of features to Udo Munk's original upstream project:
-- support for S100 sound cards with SDL2 and PortAudio sound frameworks (currently used by Cromemco D+7A, Newtech Model 6 Music Board and ADS Noisemaker emulation)
-- joystick support (Cromemco D+7A/JS-1) with common game controllers
-- added CPU timer functionality for accurate synchronization of CPU emulation and device emulation
-- more accurate Cromemco Dazzler emulation (performance rendering, interlaced display, line status flag, window resize etc.)
-- support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board) and the versatile CompuPro Spectrum graphics card, utilizing an advanced MC6847 Video Display Generator chip
+- Support for S100 sound cards with SDL2 and PortAudio sound frameworks (currently used by Cromemco D+7A, Newtech Model 6 Music Board and ADS Noisemaker emulation)
+- Joystick support (Cromemco D+7A/JS-1) with common game controllers
+- Added CPU timer functionality for accurate synchronization of CPU emulation and device emulation
+- More accurate Cromemco Dazzler emulation (performance rendering, interlaced display, line status flag, window resize etc.)
+- Support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board) and the versatile CompuPro Spectrum graphics card, utilizing an advanced MC6847 Video Display Generator chip
 - Cromemco Dazzler and D+7A boards now can be individually selected via separate build switches
-- bugfix for Cromemco Cyclops emulation
-- more general structure for SDL2 clients (can also be windowless like joysticks)
+- Bugfix for Cromemco Cyclops emulation
+- More general structure for SDL2 clients (can also be windowless like joysticks)
 
 There have been two reasons for the update.
 
