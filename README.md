@@ -166,7 +166,7 @@ usbipd attach --wsl --busid <bus-id>
 ```
 Check with 'lsusb' in the WSL console, whether the device gets listed.
 
-### Rebuilding the WSL2 kernel
+### Re-building the WSL2 kernel
 
 For rebuilding the kernel, follow in general the instructions in https://github.com/microsoft/WSL2-Linux-Kernel.
 
