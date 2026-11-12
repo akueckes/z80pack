@@ -110,11 +110,11 @@ Since the later revisions, the use of z80pack under MS Windows is normally achie
 
 First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Since Windows 11, WSL passes audio via an intermediate PulseAudio server to the Windows audio system. PulseAudio is known not always to flush data correctly when threads are terminated, which might cause SDL2 to hang during emulator shutdown so that you need to kill the emulator with CTRL-C.
 
-For PortAudio, most ready-to-use PortAudio packages do NOT support PulseAudio out of the box, since PulseAudio has been replaced by ALSA + PipeWire in recent Linux distros. In that case you will get a "PortAudio: Could not open default stream" error message (among others, mostly ALSA errors). The solution is to re-build the PortAudio package with enabling PulseAudio support.
+For PortAudio, most ready-to-use PortAudio packages do NOT support PulseAudio out of the box, since PulseAudio has been replaced by ALSA + PipeWire in recent Linux distros. In that case you will get a "PortAudio: Could not open default stream" error message (among others, mostly ALSA errors). The solution is to re-build the PortAudio package with enabling PulseAudio support. Please follow the instructions in the below section "Re-building PortAudio".
 
 Second, the WSL Linux kernel probably will not be configured out-of-the-box for supporting game controllers. You might have to change the kernel configuration, rebuild the kernel and activate it for WSL. If you plan to use SDL2 with z80pack, also perform the steps in section "Enabling SDL2 support for controllers" below. Overall, enabling audio and controller support with WSL is a bit tricky, but doable.
 
-### Rebuilding PortAudio
+### Re-building PortAudio
 
 Uninstall all already existing PortAudio packages. If not already present, install the PulseAudio packages for Fedora
 
