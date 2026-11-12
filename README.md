@@ -374,7 +374,7 @@ In addition to Udo Munk's instructions on Ubuntu, below are the steps to bild z8
 1. Install the packages required for z80pack
 ```
 sudo dnf group install development-tools
-sudo dnf install mesa-libGL-devel libjpeg-devel libXrender-devel portaudio-devel
+sudo dnf install mesa-libGL-devel libjpeg-devel libXext-devel libXrender-devel portaudio-devel
 ```
 For SDL2, also install
 ```
