@@ -3,16 +3,16 @@
 z80pack is a mature emulator of multiple platforms with 8080 and Z80 CPU.
 
 This fork adds a couple of features to Udo Munk's original upstream project:
-- support for S100 sound cards with SDL2 and PortAudio sound frameworks (currently used by Cromemco D+7A and ADS Noisemaker emulation)
-- joystick support (Cromemco D+7A/JS-1) with common game controllers
-- added CPU timer functionality for accurate synchronization of CPU emulation and device emulation
-- more accurate Cromemco Dazzler emulation (performance rendering, interlaced display, line status flag, window resize etc.)
-- support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board) and the versatile CompuPro Spectrum graphics card, utilizing an advanced MC6847 Video Display Generator chip
+- Support for S100 sound cards with SDL2 and PortAudio sound frameworks (currently used by Cromemco D+7A, Newtech Model 6 Music Board and ADS Noisemaker emulation)
+- Joystick support (Cromemco D+7A/JS-1) with common game controllers
+- Added CPU timer functionality for accurate synchronization of CPU emulation and device emulation
+- More accurate Cromemco Dazzler emulation (performance rendering, interlaced display, line status flag, window resize etc.)
+- Support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board) and the versatile CompuPro Spectrum graphics card, utilizing an advanced MC6847 Video Display Generator chip
 - Cromemco Dazzler and D+7A boards now can be individually selected via separate build switches
-- bugfix for Cromemco Cyclops emulation
-- more general structure for SDL2 clients (can also be windowless like joysticks)
+- Bugfix for Cromemco Cyclops emulation
+- More general structure for SDL2 clients (can also be windowless like joysticks)
 
-There have been two reasons for the update.
+There have been two major reasons for the update.
 
 The first reason is related to the fact that the Cromemco Dazzler hardware is a quite interesting piece of history, which not just brought graphics capabilities to the Altair/Imsai world already in 1975, but also had been designed with some tweaking in mind, achieved with real-time programming the Dazzler registers (see the Dazzler patent for some more information). For this, the emulation has to improve timing accuracy in terms of being in sync with the CPU clock as much as possible. For some tweaks, also the implementation of the odd-even-line status flag is important, which actually is bound to the Dazzler's DMA cycles. The Dazzler started a development of different graphics solutions later from Cromemco itself, but also from Matrox or Vector Graphic, which experimented with different features. The Vector Graphic HiRes board follows a very similar approach as the Dazzler, but drops color support and rather offers its own 8 kByte video buffer mapped into the address space with double the graphics resolution of a Dazzler for monochrome displays.
 
@@ -23,65 +23,82 @@ The second reason is that already in the early times of hobbyist computing, surp
 It was a twist of fate, that the early Cromemco products - although groundbreaking at their time, and paving the road for followers - were not long enough in the market to create a relevant number of applications which really made use of the potentials of the hardware. So the pile of original software for the hardware is limited. Fortunately, today we have a vivid demo scene, which aims for showing what might have been possible with the technology and the knowledge of the time. Which will need accurate emulations since the original hardware is becoming increasingly rare and sometimes expensive. In any case, those early products have been preparer for whatever came behind.
 
 ## General notes/limitations:
-- machines cromemcosim and imsaisim are used as examples how to enable and pre-configure the new hardware emulations (see sim.h, simio.c, simcfg.c and system.conf files)
-- sound cards, joysticks and new graphics hardware emulations currently operate in command line mode only, the z80pack web frontend is missing the appropriate Javascript support (library needs to be updated). Also, there is a bug in the Javascript library which affects the correct rendering of 4x4 (=monochrome) video mode for the Dazzler emulation.
+- Machines cromemcosim and imsaisim are used as examples how to enable and pre-configure the new hardware emulations (see sim.h, simio.c, simcfg.c and system.conf files)
+- Sound cards, joysticks and new graphics hardware emulations currently operate in command line mode only, the z80pack web frontend is missing the appropriate Javascript support (library needs to be updated). Also, there is a bug in the Javascript library which affects the correct rendering of 4x4 (=monochrome) video mode for the Dazzler emulation.
 - If you need to run the emulation within Microsoft Windows, the Windows Subsystem for Linux (WSL) has a couple of advantages compared to the Cygwin approach of earlier z80pack versions. Since a full Linux is run in a container, we can use a genuine Linux distro of your choice and not just a Posix environment. Also there are significant performance improvements. Unfortunately, WSL offers limited support for audio, and no support at all for using game controllers. See below for how to configure your WSL environment for changing this on your own. It works out a bit tricky, but it works.
 - SDL2 under certain conditions seems to create noise with a phase directly related to the selected audio buffer size, probably when calling the audio callback function. Only seen with Ubuntu (libsdl2-2.0-0 version 2.30.0+dfsg-1ubuntu3.1), no fix yet.
 
 ## Notes on Cromemco Dazzler
-- define HAS_DAZZLER in the appropriate sim.h file to enable this emulation during build
-- additional config settings in the system.conf file:
-	- set **dazzler_interlaced** to 1 to enable interlaced display for the Dazzler
-	- set **dazzler_frame_sync** to 1 to avoide frame tearing during the verical scan period
-	- set **dazzler_stats** to 1 to enable some statistics output
+- Define HAS_DAZZLER in the appropriate sim.h file to enable this emulation during build
+- Additional config settings in the system.conf file:
+	- Set **dazzler_interlaced** to 1 to enable interlaced display for the Dazzler
+	- Set **dazzler_frame_sync** to 1 to avoide frame tearing during the verical scan period
+	- Set **dazzler_stats** to 1 to enable some statistics output
 
 ## Notes on Cromemco D+7A
-- define HAS_D7A in the appropriate sim.h file to enable this emulation during build
-- the D+7A now supports both audio playback and joystick inputs
-- can be configured to produce a WAV file as recording of an audio sequence
-- build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
-- alternatively, build z80pack with WANT_SDL=YES to use SDL2 framework for display, joysticks and sound
-- emulates two JS-1 joysticks with integrated speaker (assigned to left and right audio channel, respectively)
-- joystick 1 uses the lower 4 bits of port 24 for buttons input (pressed=0, released=1), port 25 for x-axis input and audio output, and port 26 for y-axis input
-- joystick 2 uses the upper 4 bits of port 24 for buttons input (pressed=0, released=1), port 27 for x-axis input and audio output, and port 28 for y-axis input
-- audio port 25 is mapped to the left audio channel, audio port 27 is mapped to the right audio channel
-- additional config settings in the system.conf file:
-	- set **d7a_sample_rate** as an integer for the sampling rate of the audio framework in samples/second
-	- set **d7a_sync_adjust** as a floating point number to adjust the sound buffer processing speed with a multiplier (in order to reach the optimum balance between buffer overflows and underflows), where a value of 1.0 means no change
-	- set **d7a_buffer_size** as an integer for the size of the sample buffer in samples (limits the processing delay)
-  	- set **d7a_soundfile** as a string for the filename of the recording WAV file (also enables recording)
-  	- set **d7a_recording_limit** as an integer for the maximum number of samples to limit the size of a recording
-  	- set **d7a_stats** to 1 for printing some audio stats when shutting down the emulator (can be used for tuning the balance of buffer over- and underflows)
- - audio and joystick/game controller support in Linux is not standardized, sometimes it works out of the box, sometimes it requires additional configurations. Especially game controller support might include rebuilding the kernel (this version of z80pack reports joysticks found during start-up of the emulation). Hint: check for files /dev/inputs/js* and /dev/inputs/event*. Also, passing through game controllers via WSL requires special handling.
- - some game controllers come with an integrated audio device, be aware that audio output might be routed to this device when being plugged in (no sound on all other devices). You might think about disabling the game controller's audio device.
+- Define HAS_D7A in the appropriate sim.h file to enable this emulation during build
+- The D+7A now supports both audio playback and joystick inputs
+- Can be configured to produce a WAV file as recording of an audio sequence
+- Build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
+- Alternatively, build z80pack with WANT_SDL=YES to use SDL2 framework for display, joysticks and sound
+- Emulates two JS-1 joysticks with integrated speaker (assigned to left and right audio channel, respectively)
+- Joystick 1 uses the lower 4 bits of port 24 for buttons input (pressed=0, released=1), port 25 for x-axis input and audio output, and port 26 for y-axis input
+- Joystick 2 uses the upper 4 bits of port 24 for buttons input (pressed=0, released=1), port 27 for x-axis input and audio output, and port 28 for y-axis input
+- Audio port 25 is mapped to the left audio channel, audio port 27 is mapped to the right audio channel
+- Additional config settings in the system.conf file:
+	- Set **d7a_sample_rate** as an integer for the sampling rate of the audio framework in samples/second
+	- Set **d7a_sync_adjust** as a floating point number to adjust the sound buffer processing speed with a multiplier (in order to reach the optimum balance between buffer overflows and underflows), where a value of 1.0 means no change
+	- Set **d7a_buffer_size** as an integer for the size of the sample buffer in samples (limits the processing delay)
+  	- Set **d7a_soundfile** as a string for the filename of the recording WAV file (also enables recording)
+  	- Set **d7a_recording_limit** as an integer for the maximum number of samples to limit the size of a recording
+  	- Set **d7a_stats** to 1 for printing some audio stats when shutting down the emulator (can be used for tuning the balance of buffer over- and underflows)
+	- Set **d7a_axis_map** to re-map the axis of your game controller to the axis of the emulated joystick
+ 	- Set **d7a_button_map** to re-map the buttons of your game controller to the buttons of the emulated joystick
+ - Audio and joystick/game controller support in Linux is not standardized, sometimes it works out of the box, sometimes it requires additional configurations. Especially game controller support might include rebuilding the kernel (this version of z80pack reports joysticks found during start-up of the emulation). Hint: check for files /dev/inputs/js* and /dev/inputs/event*. Also, passing through game controllers via WSL requires special handling.
+ - Some game controllers come with an integrated audio device, be aware that audio output might be routed to this device when being plugged in (no sound on all other devices). You might think about disabling the game controller's audio device.
+
+## Notes on Newtech Model 6 Music Board
+- Define HAS_MUSICBOARD in the appropriate sim.h file to enable this emulation during build
+- Can be configured to produce a WAV file as recording of an audio sequence
+- Build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
+- Alternatively, build z80pack with WANT_SDL=YES to use SDL2 framework for display, joysticks and sound
+- Audio port 36 is mapped to the left audio channel on the first board, audio port 40 is mapped to the right audio channel on the second board
+- Additional config settings in the system.conf file:
+	- Set **musicboard_sample_rate** as an integer for the sampling rate of the audio framework in samples/second
+	- Set **musicboard_sync_adjust** as a floating point number to adjust the sound buffer processing speed with a multiplier (in order to reach the optimum balance between buffer overflows and underflows), where a value of 1.0 means no change
+	- Set **musicboard_buffer_size** as an integer for the size of the sample buffer in samples (limits the processing delay)
+  	- Set **musicboard_soundfile** as a string for the filename of the recording WAV file (also enables recording)
+  	- Set **musicboard_recording_limit** as an integer for the maximum number of samples to limit the size of a recording
+  	- Set **musicboard_stats** to 1 for printing some audio stats when shutting down the emulator (can be used for tuning the balance of buffer over- and underflows)
 
 ## Notes on ADS Noisemaker
-- define HAS_NOISEMAKER in the appropriate sim.h file to enable this emulation during build
-- uses two AY-3-8910 programmed sound generators for stereo synthesis with 6 independent tone channels and 2 noise channels
-- can record a certain amount of playback into a user selected WAV file
-- build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
-- alternatively, build z80pack with WANT_SDL=YES to use SDL2 framework for display, joysticks and sound
-- additional config settings in the system.conf file:
-	- set **noisemaker_sample_rate** as an integer for the sampling rate of the audio framework in samples/second
- 	- set **noisemaker_soundfile** as a string for the filename of the recording WAV file (also enables recording)
-	- set **noisemaker_recording_limit** as an integer for the maximum number of samples to limit the size of a recording
+- Define HAS_NOISEMAKER in the appropriate sim.h file to enable this emulation during build
+- Uses two AY-3-8910 programmed sound generators for stereo synthesis with 6 independent tone channels and 2 noise channels
+- Can record a certain amount of playback into a user selected WAV file
+- Build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
+- Alternatively, build z80pack with WANT_SDL=YES to use SDL2 framework for display, joysticks and sound
+- Additional config settings in the system.conf file:
+	- Set **noisemaker_sample_rate** as an integer for the sampling rate of the audio framework in samples/second
+	- Set **noisemaker_buffer_size** as an integer for the buffer size requested from the audio subsystem
+ 	- Set **noisemaker_soundfile** as a string for the filename of the recording WAV file (also enables recording)
+	- Set **noisemaker_recording_limit** as an integer for the maximum number of samples to limit the size of a recording
 
 ## Notes on Vector Graphic HiRes Graphics
-- define HAS_VECTOR_GRAPHIC_HIRES in the appropriate sim.h file to enable this emulation during build
-- additional config settings in the system.conf file:
-	- set **vector_graphic_hires_mode** for the graphic mode either to "bilevel" or "gradient"
-	- set **vector_graphic_hires_address** as an integer for the start address of the video buffer in memory
-	- set **vector_graphic_hires_fg** as a triple of R,G,B values each between 0 and 255 for the foreground color (simulates a monochrome CRT display color)
+- Define HAS_VECTOR_GRAPHIC_HIRES in the appropriate sim.h file to enable this emulation during build
+- Additional config settings in the system.conf file:
+	- Set **vector_graphic_hires_mode** for the graphic mode either to "bilevel" or "gradient"
+	- Set **vector_graphic_hires_address** as an integer for the start address of the video buffer in memory
+	- Set **vector_graphic_hires_fg** as a triple of R,G,B values each between 0 and 255 for the foreground color (simulates a monochrome CRT display color)
 
 ## Notes on CompuPro Spectrum
-- define HAS_COMPUPRO_SPECTRUM in the appropriate sim.h file to enable this emulation during build
-- additional config settings in the system.conf file:
-	- set **spectrum_address** as an integer for the start address of the video buffer in memory
-	- set **spectrum_interlaced** to 1 to enable interlaced display for the Spectrum
-	- set **spectrum_frame_sync** to 1 to synchronize screen updates to vertical blank
-	- set **spectrum_border** to 1 to show the screen border around the active area
-	- set **spectrum_artifacts** to 1 to visualize NTSC artifacts in hires mode
-	- set **spectrum_stats** to 1 to enable statistics output
+- Define HAS_COMPUPRO_SPECTRUM in the appropriate sim.h file to enable this emulation during build
+- Additional config settings in the system.conf file:
+	- Set **spectrum_address** as an integer for the start address of the video buffer in memory
+	- Set **spectrum_interlaced** to 1 to enable interlaced display for the Spectrum
+	- Set **spectrum_frame_sync** to 1 to synchronize screen updates to vertical blank
+	- Set **spectrum_border** to 1 to show the screen border around the active area
+	- Set **spectrum_artifacts** to 1 to visualize NTSC artifacts in hires mode
+	- Set **spectrum_stats** to 1 to enable statistics output
 
 ## PortAudio notes
 The PortAudio sound framework can be selected instead of SDL2 for emulation of devices which support audio (e.g. Cromemco D+7A and ADS Noisemaker emulation). First make sure the proper packages are installed (portaudio-devel for Fedora, and portaudio19-dev for Debian/Ubuntu). Then use 'WANT_PORTAUDIO=YES make' for building z80pack with support for the PortAudio framework. For using Windows Subsystem for Linux (WSL) there may be additional steps required (see WSL section below).
