@@ -60,6 +60,7 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
 
 ## Notes on Newtech Model 6 Music Board
 - Define HAS_MUSICBOARD in the appropriate sim.h file to enable this emulation during build
+- Actually two boards are emulated, allowing two channels for stereo audio output
 - Can be configured to produce a WAV file as recording of an audio sequence
 - Build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
 - Alternatively, build z80pack with WANT_SDL=YES to use SDL2 framework for display, joysticks and sound
