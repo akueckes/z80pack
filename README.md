@@ -8,7 +8,7 @@ This fork adds a couple of features to Udo Munk's original upstream project:
 - Added CPU timer functionality for accurate synchronization of CPU emulation and device emulation
 - More accurate Cromemco Dazzler emulation (performance rendering, interlaced display, line status flag, window resize etc.)
 - Support for higher resolution S100 monochrome graphics (Vector Graphic High Resolution Graphics board) and the versatile CompuPro Spectrum graphics card, utilizing an advanced MC6847 Video Display Generator chip
-- Cromemco Dazzler and D+7A boards now can be individually selected via separate build switches
+- Cromemco Dazzler and D+7A boards now can be individually enabled via separate build switches
 - Bugfix for Cromemco Cyclops emulation
 - More general structure for SDL2 clients (can also be windowless like joysticks)
 
@@ -24,6 +24,7 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
 
 ## General notes/limitations:
 - Machines cromemcosim and imsaisim are used as examples how to enable and pre-configure the new hardware emulations (see sim.h, simio.c, simcfg.c and system.conf files)
+- I have added another machine called 'msysim' which you can use to configure your own setup. As an example I have configured an IMSAI based machine with Tarbell floppy controller, MeMon and most of the emulated sound & video hardware enabled, reflecting my own physical setup.
 - Sound cards, joysticks and new graphics hardware emulations currently operate in command line mode only, the z80pack web frontend is missing the appropriate Javascript support (library needs to be updated). Also, there is a bug in the Javascript library which affects the correct rendering of 4x4 (=monochrome) video mode for the Dazzler emulation.
 - If you need to run the emulation within Microsoft Windows, the Windows Subsystem for Linux (WSL) has a couple of advantages compared to the Cygwin approach of earlier z80pack versions. Since a full Linux is run in a container, we can use a genuine Linux distro of your choice and not just a Posix environment. Also there are significant performance improvements. Unfortunately, WSL offers limited support for audio, and no support at all for using game controllers. See below for how to configure your WSL environment for changing this on your own. It works out a bit tricky, but it works.
 - SDL2 under certain conditions seems to create noise with a phase directly related to the selected audio buffer size, probably when calling the audio callback function. Only seen with Ubuntu (libsdl2-2.0-0 version 2.30.0+dfsg-1ubuntu3.1), no fix yet.
@@ -59,6 +60,7 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
 
 ## Notes on Newtech Model 6 Music Board
 - Define HAS_MUSICBOARD in the appropriate sim.h file to enable this emulation during build
+- Actually two boards are emulated, allowing two channels for stereo audio output
 - Can be configured to produce a WAV file as recording of an audio sequence
 - Build z80pack with WANT_PORTAUDIO=YES to use the PortAudioframework for sound, X11 for display and the standard Linux joystick driver for joysticks
 - Alternatively, build z80pack with WANT_SDL=YES to use SDL2 framework for display, joysticks and sound
@@ -108,11 +110,11 @@ Since the later revisions, the use of z80pack under MS Windows is normally achie
 
 First, audio latency with WSL is significantly higher. This will not so much affect music playback, but sound events generated e.g. in games might not be in sync with the action. Since Windows 11, WSL passes audio via an intermediate PulseAudio server to the Windows audio system. PulseAudio is known not always to flush data correctly when threads are terminated, which might cause SDL2 to hang during emulator shutdown so that you need to kill the emulator with CTRL-C.
 
-For PortAudio, most ready-to-use PortAudio packages do NOT support PulseAudio out of the box, since PulseAudio has been replaced by ALSA + PipeWire in recent Linux distros. In that case you will get a "PortAudio: Could not open default stream" error message (among others, mostly ALSA errors). The solution is to re-build the PortAudio package with enabling PulseAudio support.
+For PortAudio, most ready-to-use PortAudio packages do NOT support PulseAudio out of the box, since PulseAudio has been replaced by ALSA + PipeWire in recent Linux distros. In that case you will get a "PortAudio: Could not open default stream" error message (among others, mostly ALSA errors). The solution is to re-build the PortAudio package with enabling PulseAudio support. Please follow the instructions in the below section "Re-building PortAudio".
 
 Second, the WSL Linux kernel probably will not be configured out-of-the-box for supporting game controllers. You might have to change the kernel configuration, rebuild the kernel and activate it for WSL. If you plan to use SDL2 with z80pack, also perform the steps in section "Enabling SDL2 support for controllers" below. Overall, enabling audio and controller support with WSL is a bit tricky, but doable.
 
-### Rebuilding PortAudio
+### Re-building PortAudio
 
 Uninstall all already existing PortAudio packages. If not already present, install the PulseAudio packages for Fedora
 
@@ -164,7 +166,7 @@ usbipd attach --wsl --busid <bus-id>
 ```
 Check with 'lsusb' in the WSL console, whether the device gets listed.
 
-### Rebuilding the WSL2 kernel
+### Re-building the WSL2 kernel
 
 For rebuilding the kernel, follow in general the instructions in https://github.com/microsoft/WSL2-Linux-Kernel.
 
@@ -362,7 +364,7 @@ If a USB game controller also integrates audio hardware, your Linux in the WSL i
 
 In general, the X server integrated in WSL2 (WSLg) is special in certain aspects. Window size hints seem to be widely ignored by WSL's window manager. You might consider using GWSL (https://opticos.github.io/gwsl/) instead.
 
-Full documentation of the upstream project is at https://www.icl1900.co.uk/unix4fun/z80pack
+Full documentation of the upstream z80pack project is at https://www.icl1900.co.uk/unix4fun/z80pack
 
 In addition to Udo Munk's instructions on Ubuntu, below are the steps to bild z80pack also on Fedora Linux based on this repo.
 
@@ -372,7 +374,7 @@ In addition to Udo Munk's instructions on Ubuntu, below are the steps to bild z8
 1. Install the packages required for z80pack
 ```
 sudo dnf group install development-tools
-sudo dnf install mesa-libGL-devel libjpeg-devel libXrender-devel portaudio-devel
+sudo dnf install mesa-libGL-devel libjpeg-devel libXext-devel libXrender-devel portaudio-devel
 ```
 For SDL2, also install
 ```
