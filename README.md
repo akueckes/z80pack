@@ -29,6 +29,20 @@ It was a twist of fate, that the early Cromemco products - although groundbreaki
 - If you need to run the emulation within Microsoft Windows, the Windows Subsystem for Linux (WSL) has a couple of advantages compared to the Cygwin approach of earlier z80pack versions. Since a full Linux is run in a container, we can use a genuine Linux distro of your choice and not just a Posix environment. Also there are significant performance improvements. Unfortunately, WSL offers limited support for audio, and no support at all for using game controllers. See below for how to configure your WSL environment for changing this on your own. It works out a bit tricky, but it works.
 - SDL2 under certain conditions seems to create noise with a phase directly related to the selected audio buffer size, probably when calling the audio callback function. Only seen with Ubuntu (libsdl2-2.0-0 version 2.30.0+dfsg-1ubuntu3.1), no fix yet.
 
+## Notes on machine mysim/getting started
+I have added another machine called mysim. Purpose behind is to configure your own individual system from any of the emulated hardware modules. I am using this one to reflect my own hardware, so I can develop and test new applications in the simulation before transferring everything to the real machine. All other simulated machine configurations such as cromemcosim or imsaisim may stay untouched.
+
+mysim is initially configured for supporting a setup with Tarbell floppy disc controller, Cromemco TV Dazzler, CompuPro Spectrum, Vector Graphic HiRes Graphics, Cromemco D+7A and ADS Noisemaker. Also, MeMon is installed as a ROM monitor.
+
+For a quick start, follow these steps:
+- Enter directoy mysim
+- Execute cpm40k
+- On the front panel, first push the ON button, then the RUN button
+- When CP/M is up, change to the second floppy drive with B:
+- Execute one of the provided tool for testing the audio and video hardware (AUDIO, DAZZLER, SPECTRUM, HIRES)
+
+You can change the hardware setup in the file simsrc/sim.h by setting or removing the # in the appropriate line and re-building the package. Don't forget to specify either WANT_PORTAUDIO=YES or WANT_SDL=YES for enabling audio support.
+
 ## Notes on Cromemco Dazzler
 - Define HAS_DAZZLER in the appropriate sim.h file to enable this emulation during build
 - Additional config settings in the system.conf file:
