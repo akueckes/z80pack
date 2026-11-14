@@ -1,0 +1,11 @@
+#!/bin/sh
+
+rm -f disks/drivea.dsk
+ln disks/library/cpm40k-tarbell.dsk disks/drivea.dsk
+rm -f disks/driveb.dsk
+ln disks/library/audio-video.dsk disks/driveb.dsk
+
+
+BOOTENV=`sed '/^#/d;s/#.*$//;' conf/boot.conf | xargs`
+
+env $BOOTENV ./mysim $*
