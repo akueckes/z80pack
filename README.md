@@ -39,9 +39,9 @@ For a quick start, follow these steps:
 - Execute cpm40k
 - On the front panel, first push the ON button, then the RUN button
 - When CP/M is up, change to the second floppy drive with B:
-- Execute one of the provided tool for testing the audio and video hardware (AUDIO, DAZZLER, SPECTRUM, HIRES)
+- Execute one of the provided tools for testing the audio and video hardware (AUDIO, DAZZLER, SPECTRUM, HIRES)
 
-You can change the hardware setup in the file simsrc/sim.h by setting or removing the # in the appropriate line and re-building the package. Don't forget to specify either WANT_PORTAUDIO=YES or WANT_SDL=YES for enabling audio support.
+You can change the hardware setup in the file simsrc/sim.h by commenting / uncommenting the appropriate line and re-building the package. Don't forget to specify either WANT_PORTAUDIO=YES or WANT_SDL=YES for enabling audio support during the build.
 
 ## Notes on Cromemco Dazzler
 - Define HAS_DAZZLER in the appropriate sim.h file to enable this emulation during build
