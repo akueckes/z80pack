@@ -446,7 +446,7 @@ static int mul_term(WORD *resultp)
 {
 	register int err, erru;
 	register BYTE opr_type;
-	WORD value;
+	WORD value=0;
 
 	if ((erru = factor(resultp)) > E_UNDSYM)
 		return erru;
