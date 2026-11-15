@@ -662,7 +662,7 @@ void ads_noisemaker_init(void)
     	noisemaker_recording_limit,			/* wanted recording limit in bytes */
     	&noisemaker_audio_callback,			/* PSG callback */
     	&sound_board);					/* user data for PSG callback */
-
+#if 0
 	printf("\rNoisemaker rate=%lu size=%lu file=%s limit=%lu callback=%lu data=%lu\n",
 	    	noisemaker_sample_rate,			/* requested sample rate in samples/s, returns actual sample rate */
 	    	noisemaker_buffer_size,			/* requested audio buffer size, returns actual buffer size */
@@ -670,6 +670,7 @@ void ads_noisemaker_init(void)
 	    	noisemaker_recording_limit,			/* wanted recording limit in bytes */
 	    	(unsigned long)&noisemaker_audio_callback,			/* PSG callback */
 	    	(unsigned long)&sound_board);					/* user data for PSG callback */
+#endif
 
     if (audio_device >= 0) {
     	LOG(TAG, "Noisemaker initialized and ready to use\n");
